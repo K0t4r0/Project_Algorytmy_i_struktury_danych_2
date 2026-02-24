@@ -9,7 +9,7 @@ n,m = map(int, input().split())
 
 matrix = [[0 for _ in range(n)] for _ in range(n)]
 lista = {i: [] for i in range(n)}
-tab1, tab2 = [], [] 
+tab1, tab2 = [0], [] 
 
 for _ in range (m):
     w1,w2,g = map(int, input().split())
@@ -20,13 +20,10 @@ for _ in range (m):
     lista[w1].append((w2, g))
     lista[w2].append((w1, g))
 
-count = 0
 for i in range(n):
-    tab1.append(count)
-    for j in range(n):
-        if (matrix[i][j] != 0):
-            count += 1
-            tab2.append((j, matrix[i][j]))
+    for (v, w) in lista[i]:
+        tab2.append((v, w))
+    tab1.append(len(tab2))
     
 print("--Macierz Sasiedztwa--")
 

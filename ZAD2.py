@@ -1,7 +1,7 @@
 import heapq
 from collections import defaultdict
 
-def dijkstra(graph, start):
+def dijkstra(graph, start, end):
     distances = {node: float('inf') for node in graph}
     
     parents = {node: None for node in graph}
@@ -23,7 +23,21 @@ def dijkstra(graph, start):
                 parents[neighbor] = current_node
                 heapq.heappush(priority_queue, (distance, neighbor))
                 
-    return distances, parents
+    # return distances, parents
+    list_rev = []
+    current_node = end
+
+    while not bool(list_rev) or list_rev[-1] != start:
+        list_rev.append(current_node)
+        current_node = parents[current_node]
+
+    print("Dijkstra: The shortest way: ", end="")
+    while bool(list_rev):
+        print(list_rev[-1], end="")
+        list_rev.pop()
+        if bool(list_rev):
+            print(" -> ", end="")
+    print("\nTotal weight of the shortest route:", distances[end])
 
 def moorea_bellmana(graph, n, start, end):
     distances = {node: float('inf') for node in range(1, n + 1)}
@@ -40,7 +54,7 @@ def moorea_bellmana(graph, n, start, end):
             if distances[u] != float('inf') and distances[u] + weight < distances[v]:
                 return "The graph contains a negative cycle"
 
-    return distances[end]
+    print(f"Bellman-Ford-Moore: the shortest way from {start} to {end}: {distances[end]}")
 
 
 # example
@@ -67,8 +81,5 @@ for _ in range(m):
     graph[w1][w2] = g
     graph[w2][w1] = g
 
-ways, parents = dijkstra(graph, start)
-
-print(f"Dijkstra: The shortest way from {start} to {end}: {ways[end]}")
-
-print(f"Algorytm Moore`a - Bellmana: The shortest way from {start} to {end}: {moorea_bellmana(graph, n, start, end)}")
+dijkstra(graph, start, end)
+moorea_bellmana(graph, n, start, end)

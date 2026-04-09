@@ -15,7 +15,7 @@ class CompressionPage(ctk.CTkFrame):
 
         ctk.CTkLabel(left_frame, text="Compression", font=("Arial", 30, "bold")).pack(pady=20)
 
-        scroll = ctk.CTkScrollableFrame(left_frame)
+        scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
         scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
 
         for i in range(1, 31):
@@ -35,14 +35,14 @@ class CompressionPage(ctk.CTkFrame):
                                   fg_color=BG_SECONDARY)
         main_frame.pack(padx=20,pady=20, fill="both", expand=True)
 
-        mid_frame = ctk.CTkFrame(main_frame)
-        mid_frame.pack(padx=5,pady=5, side="left", fill="both", expand=True)
+        mid_frame = ctk.CTkFrame(main_frame, fg_color=BG_THIRDY)
+        mid_frame.pack(padx=15,pady=15, side="left", fill="both", expand=True)
 
         graph_frame = ctk.CTkFrame(mid_frame)
-        graph_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        graph_frame.pack(fill="both", expand=True, padx=20, pady=(20,10))
 
         controls_frame = ctk.CTkFrame(mid_frame, height=100)
-        controls_frame.pack(fill="x", padx=10, pady=10)
+        controls_frame.pack(fill="x", padx=20, pady=(20,10))
 
         self.canvas = ctk.CTkCanvas(graph_frame, bg="white")
         self.canvas.pack(fill="both", expand=True)
@@ -58,8 +58,9 @@ class CompressionPage(ctk.CTkFrame):
         self.start_btn.pack(pady=10)
 
         right_frame = ctk.CTkFrame(main_frame,
-                                width=220
-                                )
+                                   fg_color=BG_SECONDARY,
+                                    width=220
+                                    )
         right_frame.pack(padx=5, fill="y", side="right")
         right_frame.pack_propagate(False)
 

@@ -1,0 +1,33 @@
+{
+  "dwarves": [
+    {"id": 1, "name": "Ain", "skills": ["gold"], "value": 100, "home_pos": [10, 10]},
+    {"id": 2, "name": "Bin", "skills": ["iron"], "value": 90, "home_pos": [20, 30]},
+    {"id": 3, "name": "Cin", "skills": ["coal"], "value": 80, "home_pos": [35, 15]},
+    {"id": 4, "name": "Din", "skills": ["copper"], "value": 85, "home_pos": [50, 20]},
+    {"id": 5, "name": "Ein", "skills": ["gold", "iron"], "value": 110, "home_pos": [60, 40]},
+    {"id": 6, "name": "Fin", "skills": ["coal"], "value": 75, "home_pos": [70, 10]},
+    {"id": 7, "name": "Gin", "skills": ["copper", "iron"], "value": 95, "home_pos": [80, 30]},
+    {"id": 8, "name": "Hin", "skills": ["gold"], "value": 105, "home_pos": [15, 70]},
+    {"id": 9, "name": "Iin", "skills": ["iron"], "value": 88, "home_pos": [25, 60]},
+    {"id": 10, "name": "Jin", "skills": ["coal"], "value": 92, "home_pos": [40, 75]},
+    {"id": 11, "name": "Kin", "skills": ["copper"], "value": 83, "home_pos": [55, 65]},
+    {"id": 12, "name": "Lin", "skills": ["gold"], "value": 120, "home_pos": [65, 85]},
+    {"id": 13, "name": "Min", "skills": ["iron", "coal"], "value": 97, "home_pos": [75, 55]},
+    {"id": 14, "name": "Nin", "skills": ["gold"], "value": 102, "home_pos": [85, 80]},
+    {"id": 15, "name": "Oin", "skills": ["copper"], "value": 87, "home_pos": [95, 50]}
+  ],
+  "mines": [
+    {"id": "M-01", "mine_type": "gold", "capacity": 3, "pos": [10, 20]},
+    {"id": "M-02", "mine_type": "iron", "capacity": 2, "pos": [30, 40]},
+    {"id": "M-03", "mine_type": "coal", "capacity": 4, "pos": [50, 10]},
+    {"id": "M-04", "mine_type": "copper", "capacity": 2, "pos": [70, 25]},
+    {"id": "M-05", "mine_type": "gold", "capacity": 1, "pos": [20, 80]},
+    {"id": "M-06", "mine_type": "iron", "capacity": 3, "pos": [60, 70]},
+    {"id": "M-07", "mine_type": "coal", "capacity": 2, "pos": [80, 60]}
+  ],
+  "guards": [
+    65, 78, 90, 55, 82, 91, 73, 88, 60, 77,
+    95, 69, 84, 92, 58, 71, 86, 93, 67, 80,
+    89, 74, 96, 62, 85, 79, 94, 68, 81, 87
+  ]
+}

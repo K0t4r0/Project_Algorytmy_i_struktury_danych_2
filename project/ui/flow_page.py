@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from ui.colors import *
+from tools.draw import select_example, json_files
 #from algorithms.flow import run_flow_example
 
 class FlowPage(ctk.CTkFrame):
@@ -15,17 +16,17 @@ class FlowPage(ctk.CTkFrame):
 
         ctk.CTkLabel(left_frame, text="Flow", font=("Arial", 30, "bold")).pack(pady=20)
 
-        scroll = ctk.CTkScrollableFrame(left_frame)
+        scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
         scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
 
-        for i in range(1, 31):
+        for i, json_path in enumerate(json_files, 1):
             ctk.CTkButton(scroll, 
                         text=f"Example {i}",
                         font=("Arial", 15),  
                         height=30, 
                         fg_color=SECONDARY,
-                        #command=lambda i=i: self.run_example(i)).pack(pady=5, padx=10, fill="x"
-                        )
+                        command=lambda p=json_path: select_example(p, self.canvas)
+                        ).pack(pady=5, padx=(5,10), fill="x")
 
         ctk.CTkButton(left_frame,
                         text="Back",
@@ -74,3 +75,4 @@ class FlowPage(ctk.CTkFrame):
             wraplength=200
         )
         self.info_label.pack(pady=10, padx=10)
+    

@@ -1,4 +1,3 @@
-import json
 from ui.colors import *
 from pathlib import Path
 from tools.data_manager import data_store
@@ -7,52 +6,78 @@ examples_path = Path("json/")
 json_files = list(examples_path.glob("*.json"))
 
 def select_example(json_path, canvas):
+    data_store.clear
     data_store.load_from_json(json_path)
     draw_world(canvas)
 
 def draw_world(canvas):
-    canvas.delete("all")
-    s = get_scale(canvas, data_store)
+    ax = canvas.figure.axes[0]
 
-    mines = data_store.get_mine_positions()
-    for id, pos in mines.items():
-        mx, my = pos[0] * s, pos[1] * s
-    
-        mine_type = data_store.get_mine_type(id)
+    ax.clear()
+    ax.set_facecolor(BG_THIRDY)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3, color='white')
+    ax.xaxis.grid(True, linestyle='--', alpha=0.3, color='white')
+
+    ax.tick_params(axis='both', colors='white')
+    for side in ['top', 'right']:
+        ax.spines[side].set_visible(False)
+    for side in ['left', 'bottom']:
+        ax.spines[side].set_color('white')
+
+    added_mine_types = set()
+    for m in data_store.mines:
+
+        mine_type = data_store.get_mine_type(m.id)
         m_color = MINE_COLORS.get(mine_type)
+
+        label = mine_type if mine_type not in added_mine_types else "_"
+        ax.plot(m.pos[0], m.pos[1], 'o', color=m_color, ms=14, mec='white', mew=1, label=label)
+        added_mine_types.add(mine_type)
+    
+    for d in data_store.dwarves:
+        ax.plot(d.home_pos[0], d.home_pos[1], 'o', color=DWARF_HOME, ms=14, mec='white', mew=1)
+    ax.plot([], [], 'o', color=DWARF_HOME, ms=14, mec='white', label="Dwarf")
+    
+    ax.legend(loc='upper left', 
+              bbox_to_anchor=(1, 1), 
+              facecolor=BG_THIRDY, 
+              labelcolor='white', 
+              frameon=False, 
+              fontsize=10,
+              labelspacing=1.2)
+
+    canvas.draw()
+    canvas.figure.tight_layout()
         
-        canvas.create_oval(
-            mx - 10, my - 10,
-            mx + 10, my + 10, 
-            fill=m_color, 
-            outline="black", 
-            width=2
-        )
+def draw_flow(canvas):
+    ax = canvas.figure.axes[0]
+    draw_world(canvas)
 
-    homes = data_store.get_home_positions()
-    for id, pos in homes.items():
-        dx, dy = pos[0] * s, pos[1] * s
+    if data_store.s_pos:
+        ax.plot(*data_store.s_pos, '^', color='green', ms=15, label="Source (S)")
+    if data_store.t_pos:
+        ax.plot(*data_store.t_pos, 'v', color='red', ms=15, label="Sink (T)")
+
+    ax.legend(loc='upper left', 
+              bbox_to_anchor=(1, 1), 
+              frameon=False, 
+              labelcolor='white',
+              labelspacing=1.2)
         
-        canvas.create_oval(
-            dx - 10, dy - 10, 
-            dx + 10, dy + 10, 
-            fill=DWARF_HOME, 
-            outline="#ffffff"
-        )
+    for start, end in data_store.flow_paths:
+        ax.annotate("", 
+                    xy=end, 
+                    xytext=start, 
+                    arrowprops=dict(
+                        arrowstyle="->", 
+                        color='white', 
+                        lw=1.5, 
+                        alpha=0.6,
+                        shrinkA=10,
+                        shrinkB=10  
+                    ),
+                    zorder=2)
 
-def get_scale(canvas, data_store):
-    all_x = [d.home_pos[0] for d in data_store.dwarves] + [m.pos[0] for m in data_store.mines]
-    all_y = [d.home_pos[1] for d in data_store.dwarves] + [m.pos[1] for m in data_store.mines]
-    
-    if not all_x or not all_y: return 1
+    canvas.figure.tight_layout()
+    canvas.draw()
 
-    max_x, max_y = max(all_x), max(all_y)
-    
-    canvas.update()
-    w = canvas.winfo_width()
-    h = canvas.winfo_height()
-    
-    scale_x = (w * 0.9) / max_x if max_x > 0 else 1
-    scale_y = (h * 0.9) / max_y if max_y > 0 else 1
-
-    return min(scale_x, scale_y)

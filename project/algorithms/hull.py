@@ -45,26 +45,80 @@ def jarvis(points):
     start_point = min(points, key=lambda p: (p[0], p[1])) 
 
     hull = []
-    p = start_point
+    current_p = start_point
+    
     while True:
-        hull.append(p)
-
+        hull.append(current_p)
         q = None
-
         for r in points:
-            if r == p:
-                continue
+            if r == current_p: continue
+
+            yield (list(hull), r)
+            
             if q is None:
                 q = r
                 continue
-
-            orientation = get_orientation(p, q, r)
-
-            if orientation == 2 or (orientation == 0 and dist_sq(p, r) > dist_sq(p, q)):
+            orientation = get_orientation(current_p, q, r)
+            if orientation == 2 or (orientation == 0 and dist_sq(current_p, r) > dist_sq(current_p, q)):
                 q = r
-        p = q
+        
+        current_p = q
+        if current_p == start_point: break
 
-        if p == start_point:
-            break
+    final = hull + [hull[0]]
+    yield (final, None)
 
-    return hull
+def jarvis_generator(points):
+    n = len(points)
+    if n < 3: 
+        yield (points, None)
+        return
+    
+    start_point = min(points, key=lambda p: (p[0], p[1])) 
+    hull = []
+    current_p = start_point
+    
+    while True:
+        hull.append(current_p)
+        q = None
+        for r in points:
+            if r == current_p: continue
+            
+            yield (list(hull), r)
+            
+            if q is None:
+                q = r
+                continue
+            orientation = get_orientation(current_p, q, r)
+            if orientation == 2 or (orientation == 0 and dist_sq(current_p, r) > dist_sq(current_p, q)):
+                q = r
+        
+        current_p = q
+        if current_p == start_point: break
+
+    yield (hull + [hull[0]], None)
+
+def graham_generator(points):
+    if len(points) < 3:
+        yield (points, None)
+        return
+
+    start_point = min(points, key=lambda p: (p[1], p[0]))
+    points_without_start = [p for p in points if p != start_point]
+    sorted_points = sorted(
+        points_without_start, 
+        key=lambda p: (math.atan2(p[1] - start_point[1], p[0] - start_point[0]), dist_sq(start_point, p))
+    )
+
+    hull = [start_point]
+    for p in sorted_points:
+        yield (list(hull), p)
+        
+        while len(hull) >= 2 and get_orientation(hull[-2], hull[-1], p) != 2:
+            hull.pop()
+            yield (list(hull), p)
+        
+        hull.append(p)
+        yield (list(hull), None)
+    
+    yield (hull + [hull[0]], None)

@@ -67,28 +67,47 @@ class Huffman:
                 yield 0
 
     @staticmethod
-    def decompress_to_file(compressed_data, padding_len, huffman_codes, output_path):
+    def decompress_to_file(compressed_data_stream, padding_len, huffman_codes, output_path):
         reverse_codes = {v: k for k, v in huffman_codes.items()}
-        
         current_code = ""
-        n = len(compressed_data)
-        if n == 0: return
+        
+        write_buffer = bytearray()
+        BUFFER_SIZE = 65536
 
         with open(output_path, 'wb') as f:
-            for i in range(n):
-                byte = compressed_data[i]
-                bits_to_read = 8
-                if i == n - 1:
-                    bits_to_read = 8 - padding_len
+            it = iter(compressed_data_stream)
+            
+            try:
+                byte = next(it)
+            except StopIteration:
+                return
 
-                for bit_pos in range(7, 7 - bits_to_read, -1):
-                    bit = (byte >> bit_pos) & 1
-                    current_code += str(bit)
-                    if current_code in reverse_codes:
-                        char_byte = reverse_codes[current_code]
-                        if isinstance(char_byte, int):
-                            f.write(bytes([char_byte]))
-                        else:
-                            f.write(char_byte.encode('utf-8'))
-                        
-                        current_code = ""
+            while True:
+                try:
+                    next_byte = next(it)
+                    
+                    for i in range(7, -1, -1):
+                        bit = (byte >> i) & 1
+                        current_code += str(bit)
+                        if current_code in reverse_codes:
+                            write_buffer.append(reverse_codes[current_code])
+                            current_code = ""
+                    
+                    byte = next_byte
+
+                    if len(write_buffer) >= BUFFER_SIZE:
+                        f.write(write_buffer)
+                        write_buffer.clear()
+
+                except StopIteration:
+                    bits_to_read = 8 - padding_len
+                    for i in range(7, 7 - bits_to_read, -1):
+                        bit = (byte >> i) & 1
+                        current_code += str(bit)
+                        if current_code in reverse_codes:
+                            write_buffer.append(reverse_codes[current_code])
+                            current_code = ""
+                    break
+            
+            if write_buffer:
+                f.write(write_buffer)

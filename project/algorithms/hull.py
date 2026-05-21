@@ -1,9 +1,6 @@
 import math
 
 
-def run_hull_example():
-    return "Hull algorithm running..."
-
 def get_orientation(p, q, r):
     """
     0 -> Straight
@@ -42,7 +39,7 @@ def jarvis(points):
     n = len(points)
     if n < 3: return points
     
-    start_point = min(points, key=lambda p: (p[0], p[1])) 
+    start_point = min(points, key=lambda p: (p[0], p[1]))
 
     hull = []
     current_p = start_point
@@ -51,10 +48,8 @@ def jarvis(points):
         hull.append(current_p)
         q = None
         for r in points:
-            if r == current_p: continue
-
-            yield (list(hull), r)
-            
+            if r == current_p:
+                continue
             if q is None:
                 q = r
                 continue
@@ -63,10 +58,10 @@ def jarvis(points):
                 q = r
         
         current_p = q
-        if current_p == start_point: break
+        if current_p == start_point:
+            break
 
-    final = hull + [hull[0]]
-    yield (final, None)
+    return hull
 
 def jarvis_generator(points):
     n = len(points)

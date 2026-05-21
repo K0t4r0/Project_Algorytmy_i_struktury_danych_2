@@ -1,5 +1,5 @@
 import json
-from data_classes.classes import Dwarf, Mine
+from data_classes.classes import Dwarf, Mine, BorderGuard
 
 class DataManager:
     def __init__(self):
@@ -20,7 +20,7 @@ class DataManager:
 
             self.dwarves = [Dwarf(d["id"], d["name"], d["skills"], d["value"], tuple(d["home_pos"])) for d in data["dwarves"]]
             self.mines = [Mine(m["id"], m["mine_type"], m["capacity"], tuple(m["pos"])) for m in data["mines"]]
-            self.guards = data.get("guards", [])
+            self.guards = [BorderGuard(g["id"], g["name"], g["loudness"]) for g in data.get("guards", [])]
 
             self.mode = data.get("mode", "MCMF")
             self.clear

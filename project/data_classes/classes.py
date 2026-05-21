@@ -15,3 +15,11 @@ class Mine:
     mine_type: str
     capacity: int
     pos: Tuple[int, int]
+
+@dataclass
+class BorderGuard:
+    id: int
+    name: str
+    loudness: int
+    position_meters: float = 0.0
+    edge_index: int = -1

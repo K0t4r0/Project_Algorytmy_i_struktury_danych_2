@@ -3,13 +3,15 @@ from pathlib import Path
 from tools.data_manager import data_store
 
 examples_path = Path("json/")
-json_files = list(examples_path.glob("*.json"))
+json_files = sorted(examples_path.glob("*.json"))
 
+# Loading json file
 def select_example(json_path, canvas):
     data_store.clear
     data_store.load_from_json(json_path)
     draw_world(canvas)
 
+# Drawing points (Dwarfes + Mines)
 def draw_world(canvas):
     ax = canvas.figure.axes[0]
 
@@ -48,7 +50,8 @@ def draw_world(canvas):
 
     canvas.draw()
     canvas.figure.tight_layout()
-        
+
+# Drawing arrows for flow algorithm       
 def draw_flow(canvas):
     ax = canvas.figure.axes[0]
     draw_world(canvas)
@@ -81,3 +84,50 @@ def draw_flow(canvas):
     canvas.figure.tight_layout()
     canvas.draw()
 
+
+# Drawing points (Mines)
+def draw_world_mines_only(ax):
+        ax.set_facecolor(BG_THIRDY)
+
+        ax.tick_params(axis='both', colors='white', labelsize=8)
+        ax.grid(True, linestyle='--', alpha=0.3, color='white')
+
+        for spine in ax.spines.values():
+            spine.set_color('white')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        for m in data_store.mines:
+            mine_type = data_store.get_mine_type(m.id)
+            m_color = MINE_COLORS.get(mine_type)
+            
+            ax.plot(m.pos[0], m.pos[1], 'o', 
+                    color=m_color, 
+                    ms=14, 
+                    mec='white', 
+                    mew=0.5)
+
+# Drawing path for convex hull algorithm
+def draw_sub_hull(ax, state, title, color):
+        ax.clear()
+        draw_world_mines_only(ax)
+        ax.set_title(title, color='white', fontsize=12, pad=10)
+
+        if not state or not isinstance(state, tuple):
+            return
+
+        confirmed, candidate = state
+
+        if len(confirmed) > 1:
+            hx, hy = zip(*confirmed)
+            ax.plot(hx, hy, '-', color=color, lw=2.5)
+            if len(confirmed) > 2:
+                ax.fill(hx, hy, color=color, alpha=0.1)
+
+        if candidate:
+            last_confirmed = confirmed[-1]
+            ax.plot([last_confirmed[0], candidate[0]], 
+                    [last_confirmed[1], candidate[1]], 
+                    ':', color='white', lw=1.5, alpha=0.6)
+
+            ax.plot(candidate[0], candidate[1], 'o', color='white', ms=8, alpha=0.4)

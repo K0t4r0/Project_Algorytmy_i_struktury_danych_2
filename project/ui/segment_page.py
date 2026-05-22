@@ -1,75 +1,396 @@
+import random
 import customtkinter as ctk
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-#from algorithms.flow import run_flow_example
+from tools.draw import json_files
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from tools.data_manager import data_store
+from algorithms.segment import get_border_mines, place_guards, SparseTable, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
+import os
 
 class SegmentPage(ctk.CTkFrame):
+
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=BG_MAIN)
 
-        left_frame = ctk.CTkFrame(self, 
-                     width=200,
-                     fg_color=BG_SECONDARY,
-                     corner_radius=0
-                     )
+        self.hull_mines = []
+        self.guards = []
+        self.step_m = 1.0
+        self.table = None
+        self.current_path = None
+
+        # Left frame (examples)
+        left_frame = ctk.CTkFrame(self, width=200, fg_color=BG_SECONDARY, corner_radius=0)
         left_frame.pack(fill="y", side="left")
 
-        ctk.CTkLabel(left_frame, text="Segment Tree", font=("Arial", 30, "bold")).pack(pady=20)
+        ctk.CTkLabel(left_frame, text="Border Guards", font=("Arial", 30, "bold")).pack(pady=20)
 
         scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
-        scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
+        scroll.pack(fill="both", expand=True, padx=20, pady=(5, 5))
 
-        for i in range(1, 31):
-            ctk.CTkButton(scroll, 
-                        text=f"Example {i}",
-                        font=("Arial", 15),  
-                        height=30, 
-                        fg_color=SECONDARY,
-                        #command=lambda i=i: self.run_example(i)).pack(pady=5, padx=10, fill="x"
-                        )
+        # Examples
+        for json_path in json_files:
+            filename = os.path.splitext(os.path.basename(json_path))[0]
+            ctk.CTkButton(scroll,
+                          text=filename,
+                          font=("Arial", 15),
+                          height=30,
+                          fg_color=SECONDARY,
+                          command=lambda p=json_path: self.load_example(p)
+                          ).pack(pady=5, padx=(5, 10), fill="x")
 
-        ctk.CTkButton(left_frame,
-                        text="Back",
-                        font=("Arial", 20),
-                        command=lambda: controller.show_frame("MainMenu")
-                        ).pack(pady=10)
-        
-        main_frame = ctk.CTkFrame(self,
-                                  fg_color=BG_SECONDARY)
-        main_frame.pack(padx=20,pady=20, fill="both", expand=True)
+        ctk.CTkButton(left_frame, text="Back", font=("Arial", 20),
+                      command=lambda: controller.show_frame("MainMenu")
+                      ).pack(pady=10)
+
+        # Main frame (graph)
+        main_frame = ctk.CTkFrame(self, fg_color=BG_SECONDARY)
+        main_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
         mid_frame = ctk.CTkFrame(main_frame, fg_color=BG_THIRDY)
-        mid_frame.pack(padx=15,pady=15, side="left", fill="both", expand=True)
+        mid_frame.pack(padx=15, pady=15, side="left", fill="both", expand=True)
 
         graph_frame = ctk.CTkFrame(mid_frame)
-        graph_frame.pack(fill="both", expand=True, padx=20, pady=(20,10))
+        graph_frame.pack(fill="both", expand=True, padx=20, pady=(20, 10))
 
-        controls_frame = ctk.CTkFrame(mid_frame, height=100)
-        controls_frame.pack(fill="x", padx=20, pady=(20,10))
+        self.fig = Figure(figsize=(6, 4), dpi=100, facecolor=BG_THIRDY)
+        self.ax  = self.fig.add_subplot(111)
+        self.fig.subplots_adjust(left=0.08, right=0.95, top=0.95, bottom=0.08)
 
-        self.canvas = ctk.CTkCanvas(graph_frame, bg="white")
-        self.canvas.pack(fill="both", expand=True)
+        self.canvas = FigureCanvasTkAgg(self.fig, graph_frame)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True)
 
-        self.slider = ctk.CTkSlider(controls_frame, from_=0.1, to=2)
-        self.slider.pack(pady=10, padx=10, fill="x")
+        # Attack button below the graph
+        controls_frame = ctk.CTkFrame(mid_frame, height=60, fg_color="transparent")
+        controls_frame.propagate(False)
+        controls_frame.pack(fill="x", padx=20, pady=(5, 15), side="bottom")
 
-        self.start_btn = ctk.CTkButton(
+        self.attack_btn = ctk.CTkButton(
             controls_frame,
-            text="Start Animation",
-            #command=self.start_animation
+            text="ATTACK!",
+            font=("Arial", 18, "bold"),
+            height=30,
+            fg_color=PRIMARY,
+            hover_color=PRIMARY_HOVER,
+            #command=self.simulate_edge_attack,
+            command=self.simulate_attack_by_meters,
+            state="disabled"
         )
-        self.start_btn.pack(pady=10)
+        self.attack_btn.pack(fill="x", padx=20, pady=(8,0))
 
-        right_frame = ctk.CTkFrame(main_frame,
-                                width=220
-                                )
+        # Right frame (info)
+        right_frame = ctk.CTkFrame(main_frame, fg_color=BG_SECONDARY, width=230)
         right_frame.pack(padx=5, fill="y", side="right")
         right_frame.pack_propagate(False)
 
-        ctk.CTkLabel(right_frame, text="Info", font=("Arial", 20, "bold")).pack(pady=10)
+        ctk.CTkLabel(right_frame, text="Info", font=("Arial", 20, "bold")).pack(pady=(14, 4))
 
-        self.info_label = ctk.CTkLabel(
+        self.info_box = ctk.CTkTextbox(
             right_frame,
-            text="Choose example",
-            wraplength=200
+            font=("Arial", 13),
+            fg_color=BG_SECONDARY,
+            text_color="white",
+            wrap="word",
+            state="disabled"
         )
-        self.info_label.pack(pady=10, padx=10)
+        self.info_box.pack(fill="both", expand=True, padx=10, pady=(4, 14))
+
+        self._set_info("Load an example to begin.")
+
+        self._style_axes()
+        self.canvas.draw()
+
+    def _style_axes(self):
+        ax = self.ax
+        ax.set_facecolor(BG_THIRDY)
+        ax.tick_params(axis='both', colors='white', labelsize=8)
+        ax.grid(True, linestyle='--', alpha=0.3, color='white')
+        for spine in ax.spines.values():
+            spine.set_color('white')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    def _set_info(self, text: str):
+        self.info_box.configure(state="normal")
+        self.info_box.delete("1.0", "end")
+        self.info_box.insert("end", text)
+        self.info_box.configure(state="disabled")
+
+    def load_example(self, path):
+        self.current_path = path
+        data_store.load_from_json(path)
+
+        self.hull_mines, self.guards = get_border_mines(path)
+        self.step_m = place_guards(self.hull_mines, self.guards)
+        self.table  = SparseTable(self.guards)
+
+        self.attack_btn.configure(state="normal")
+        self._set_info(
+            f"Example loaded.\n\n"
+            f"Hull mines: {len(self.hull_mines)}\n"
+            f"Guards: {len(self.guards)}\n"
+            f"Step: {self.step_m:.2f} m\n\n"
+            f"Press ATTACK to simulate an apple-smuggling raid."
+        )
+        self._draw_border()
+
+    def _draw_legend(self, ax, show_attack=False, show_winner=False):
+        entries = []
+        # border
+        entries.append(Line2D([0], [0], color="#00FF7F", lw=1.8,
+                            alpha=0.85, label="Border"))
+
+        # attacked segment
+        if show_attack:
+            entries.append(Line2D([0], [0], color="#FF3030", lw=3.0,
+                                label="Attacked segment"))
+
+        # guard
+        entries.append(Line2D([0], [0], marker='o', color='w',
+                            markerfacecolor="#88CCFF", markeredgecolor='white',
+                            markersize=7, label="Border guard"))
+
+        # winner
+        if show_winner:
+            entries.append(Line2D([0], [0], marker='*', color='w',
+                                markerfacecolor="#FFD700", markeredgecolor='white',
+                                markersize=12, label="Commander"))
+
+        ax.legend(
+            handles=entries,
+            loc="upper right",
+            fontsize=7,
+            framealpha=0.25,
+            facecolor=BG_THIRDY,
+            edgecolor="white",
+            labelcolor="white"
+        )
+
+    # Base drawing method
+    def _draw_border(self):
+        ax = self.ax
+        ax.clear()
+        self._style_axes()
+        if not self.hull_mines:
+            self.canvas.draw()
+            return
+
+        self._draw_mines(ax)
+
+        n = len(self.hull_mines)
+        for i in range(n):
+            a = self.hull_mines[i]
+            b = self.hull_mines[(i + 1) % n]
+            ax.plot([a.pos[0], b.pos[0]], [a.pos[1], b.pos[1]],
+                    '-', color="#00FF7F", lw=1.8, alpha=0.55, zorder=2)
+
+        self._draw_hull_fill(ax)
+        self._draw_guards(ax, None)
+        self._draw_legend(ax, show_attack=False, show_winner=False)
+        self.canvas.draw()
+
+    # Drawing mines
+    def _draw_mines(self, ax):
+        for m in data_store.mines:
+            mine_type = data_store.get_mine_type(m.id)
+            m_color = MINE_COLORS.get(mine_type)
+            ax.plot(m.pos[0], m.pos[1], 'o',
+                    color=m_color, ms=14, mec='white', mew=1, zorder=3)
+            ax.annotate(m.id, xy=m.pos,
+                        xytext=(4, 5), textcoords='offset points',
+                        color='white', fontsize=7, zorder=4)
+
+    # Drawing hull filling
+    def _draw_hull_fill(self, ax):
+        xs = [m.pos[0] for m in self.hull_mines]
+        ys = [m.pos[1] for m in self.hull_mines]
+        ax.fill(xs, ys, color="#00FF7F", alpha=0.06, zorder=1)
+
+    # Drawing dwarfs (guards)
+    def _draw_guards(self, ax, winner=None):
+        guard_xs, guard_ys = [], []
+        for g in self.guards:
+            gx, gy = self._guard_coords(g)
+            guard_xs.append(gx)
+            guard_ys.append(gy)
+        ax.scatter(guard_xs, guard_ys,
+                marker='o', s=40, color="#88CCFF",
+                edgecolors='white', linewidths=0.4, zorder=4)
+        if winner is not None:
+            wx, wy = self._guard_coords(winner)
+            ax.scatter([wx], [wy], marker='*', s=320,
+                    color="#FFD700", edgecolors='white', linewidths=0.8, zorder=6)
+            ax.annotate(winner.name, xy=(wx, wy),
+                        xytext=(6, 6), textcoords='offset points',
+                        color="#FFD700", fontsize=9, fontweight='bold', zorder=7)
+
+    # Convertion guard position (meters) to (x, y)
+    def _guard_coords(self, guard):
+        n = len(self.hull_mines)
+        cumulative = 0.0
+        for i in range(n):
+            a = self.hull_mines[i]
+            b = self.hull_mines[(i + 1) % n]
+            dx = b.pos[0] - a.pos[0]
+            dy = b.pos[1] - a.pos[1]
+            edge_len = (dx**2 + dy**2) ** 0.5
+
+            if i == guard.edge_index:
+                offset = guard.position_meters - cumulative
+                t = offset / edge_len if edge_len > 0 else 0
+                return a.pos[0] + t * dx, a.pos[1] + t * dy
+
+            cumulative += edge_len
+
+        return self.hull_mines[0].pos
+
+    # Simulation of attack on the edge
+    def _draw_border_edge_attack(self, highlight_edge_idx=None, winner=None):
+        ax = self.ax
+        ax.clear()
+        self._style_axes()
+        if not self.hull_mines:
+            self.canvas.draw()
+            return
+
+        self._draw_mines(ax)
+
+        n = len(self.hull_mines)
+        for i in range(n):
+            a = self.hull_mines[i]
+            b = self.hull_mines[(i + 1) % n]
+            is_attacked = (i == highlight_edge_idx)
+            color = "#FF3030" if is_attacked else "#00FF7F"
+            lw    = 3.0       if is_attacked else 1.8
+            alpha = 1.0       if is_attacked else 0.55
+            ax.plot([a.pos[0], b.pos[0]], [a.pos[1], b.pos[1]],
+                    '-', color=color, lw=lw, alpha=alpha, zorder=2)
+
+        self._draw_hull_fill(ax)
+        self._draw_guards(ax, winner)
+        self._draw_legend(ax, show_attack=True, show_winner=winner is not None)
+        self.canvas.draw()
+
+    # Simulation of attack with meters
+    def _draw_border_meter_attack(self, from_m, to_m, winner=None):
+        ax = self.ax
+        ax.clear()
+        self._style_axes()
+        if not self.hull_mines:
+            self.canvas.draw()
+            return
+
+        self._draw_mines(ax)
+
+        n = len(self.hull_mines)
+        perimeter = get_perimeter(self.hull_mines)
+        
+        from_m = from_m % perimeter
+        to_m = to_m % perimeter
+
+        intervals = []
+        if from_m > to_m:
+            intervals.append((from_m, perimeter))
+            intervals.append((0.0, to_m))
+        else:
+            intervals.append((from_m, to_m))
+
+        cumulative = 0.0
+        for i in range(n):
+            a = self.hull_mines[i]
+            b = self.hull_mines[(i + 1) % n]
+            dx = b.pos[0] - a.pos[0]
+            dy = b.pos[1] - a.pos[1]
+            edge_len = (dx**2 + dy**2) ** 0.5
+            edge_start = cumulative
+            edge_end   = cumulative + edge_len
+
+            ax.plot([a.pos[0], b.pos[0]], [a.pos[1], b.pos[1]],
+                    '-', color="#00FF7F", lw=1.8, alpha=0.55, zorder=2)
+
+            for f_m, t_m in intervals:
+                if f_m < edge_end and t_m > edge_start:
+                    clip_start = max(f_m, edge_start) - edge_start
+                    clip_end   = min(t_m,   edge_end)   - edge_start
+
+                    t0 = clip_start / edge_len if edge_len > 0 else 0
+                    t1 = clip_end   / edge_len if edge_len > 0 else 1
+
+                    x0, y0 = a.pos[0] + t0 * dx, a.pos[1] + t0 * dy
+                    x1, y1 = a.pos[0] + t1 * dx, a.pos[1] + t1 * dy
+
+                    ax.plot([x0, x1], [y0, y1],
+                            '-', color="#FF3030", lw=3.5, alpha=1.0, zorder=3)
+
+            cumulative += edge_len
+
+        self._draw_hull_fill(ax)
+        self._draw_guards(ax, winner)
+        self._draw_legend(ax, show_attack=True, show_winner=winner is not None)
+        self.canvas.draw()
+
+    def simulate_edge_attack(self):
+        if not self.hull_mines or not self.guards or self.table is None:
+            return
+
+        n = len(self.hull_mines)
+        edges_with_guards = list({g.edge_index for g in self.guards})
+        if not edges_with_guards:
+            return
+
+        edge_idx = random.choice(edges_with_guards)
+        mine_from = self.hull_mines[edge_idx]
+        mine_to   = self.hull_mines[(edge_idx + 1) % n]
+
+        winner = find_loudest_by_edge(
+            self.guards, self.table,
+            self.hull_mines, mine_from, mine_to
+        )
+
+        self._draw_border_edge_attack(highlight_edge_idx=edge_idx, winner=winner)
+
+        if winner:
+            info = (
+                f"ATTACK ON EDGE {mine_from.id} → {mine_to.id}\n\n"
+                f"Commander chosen: {winner.name}\n"
+                f"Loudness: {winner.loudness}\n"
+                f"Position: {winner.position_meters:.1f} m\n"
+            )
+        else:
+            info = f"ATTACK ON EDGE {mine_from.id} → {mine_to.id}\n\nNo guards on this edge."
+            
+        self._set_info(info)
+    
+    def simulate_attack_by_meters(self):
+        if not self.hull_mines or not self.guards or self.table is None:
+            return
+
+        perimeter = get_perimeter(self.hull_mines)
+        
+        from_m = random.uniform(0, perimeter)
+        to_m = (from_m + random.uniform(5, perimeter * 0.3)) % perimeter
+
+        winner, error = find_loudest_by_meters(
+            self.guards, self.table, self.step_m, from_m, to_m
+        )
+
+        self._draw_border_meter_attack(from_m, to_m, winner=winner)
+
+        if winner:
+            info = (
+                f"ATTACK [{from_m:.1f}m → {to_m:.1f}m]\n\n"
+                f"Commander chosen: {winner.name}\n"
+                f"Loudness: {winner.loudness}\n"
+                f"Position: {winner.position_meters:.1f} m\n\n"
+                f"{winner.name}: Archers! Draw! Fire!"
+            )
+        else:
+            info = (
+                f"ATTACK [{from_m:.1f}m → {to_m:.1f}m]\n\n"
+                f"No guards on this segment!\n\n"
+                f"{error if error else 'Empty range'}"
+            )
+
+        self._set_info(info)

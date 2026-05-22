@@ -2,9 +2,10 @@ import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import select_example, json_files
+from tools.draw import json_files, draw_sub_hull
 from tools.data_manager import data_store
 from algorithms.hull import graham_generator, jarvis_generator
+import os
 
 class HullPage(ctk.CTkFrame):
     
@@ -31,9 +32,11 @@ class HullPage(ctk.CTkFrame):
         scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
 
         #Examples
-        for i, json_path in enumerate(json_files, 1):
-            ctk.CTkButton(scroll, 
-                        text=f"Example {i}",
+        for json_path in json_files:
+            filename = os.path.splitext(os.path.basename(json_path))[0]
+
+            ctk.CTkButton(scroll,
+                        text=filename,
                         font=("Arial", 15),  
                         height=30, 
                         fg_color=SECONDARY,
@@ -115,13 +118,15 @@ class HullPage(ctk.CTkFrame):
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
 
         self.apply_step()
-        
-    #Functions for animation
+
+
+    # Functions for animation
     def load_new_example(self, path):
         self.reset_logic()
         data_store.load_from_json(path)
         self.apply_step()
 
+    # Toggle button for switching modes
     def toggle_animation_button(self):
         if self.toggle_btn.cget("text") == "Reset":
             self.reset_logic()
@@ -184,60 +189,16 @@ class HullPage(ctk.CTkFrame):
             self.current_idx -= 1
             self.apply_step()
 
+    #
     def apply_step(self):
         if self.history and self.current_idx < len(self.history):   
             state_g, state_j = self.history[self.current_idx]
         else:
             state_g, state_j = ([], None), ([], None)
 
-        self.draw_sub_hull(self.ax_graham, state_g, "Graham Scan", "#00FF7F")
-        self.draw_sub_hull(self.ax_jarvis, state_j, "Jarvis March", "#FFD700")
+        draw_sub_hull(self.ax_graham, state_g, "Graham Scan", "#00FF7F")
+        draw_sub_hull(self.ax_jarvis, state_j, "Jarvis March", "#FFD700")
         self.canvas.draw()
-
-    def draw_sub_hull(self, ax, state, title, color):
-        ax.clear()
-        self.draw_world_on_ax(ax)
-        ax.set_title(title, color='white', fontsize=12, pad=10)
-
-        if not state or not isinstance(state, tuple):
-            return
-
-        confirmed, candidate = state
-
-        if len(confirmed) > 1:
-            hx, hy = zip(*confirmed)
-            ax.plot(hx, hy, '-', color=color, lw=2.5)
-            if len(confirmed) > 2:
-                ax.fill(hx, hy, color=color, alpha=0.1)
-
-        if candidate:
-            last_confirmed = confirmed[-1]
-            ax.plot([last_confirmed[0], candidate[0]], 
-                    [last_confirmed[1], candidate[1]], 
-                    ':', color='white', lw=1.5, alpha=0.6)
-
-            ax.plot(candidate[0], candidate[1], 'o', color='white', ms=8, alpha=0.4)
-
-    def draw_world_on_ax(self, ax):
-        ax.set_facecolor(BG_THIRDY)
-
-        ax.tick_params(axis='both', colors='white', labelsize=8)
-        ax.grid(True, linestyle='--', alpha=0.3, color='white')
-
-        for spine in ax.spines.values():
-            spine.set_color('white')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-        for m in data_store.mines:
-            mine_type = data_store.get_mine_type(m.id)
-            m_color = MINE_COLORS.get(mine_type)
-            
-            ax.plot(m.pos[0], m.pos[1], 'o', 
-                    color=m_color, 
-                    ms=14, 
-                    mec='white', 
-                    mew=0.5)
 
     def reset_logic(self):
         self.history = [(([], None), ([], None))]

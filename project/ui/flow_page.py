@@ -5,6 +5,7 @@ from ui.colors import *
 from tools.draw import select_example, json_files, draw_flow, draw_world
 from algorithms.min_cost_max_flow import MCMF
 from tools.data_manager import data_store
+import os
 
 class FlowPage(ctk.CTkFrame):
     
@@ -30,9 +31,11 @@ class FlowPage(ctk.CTkFrame):
         scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
 
         #Examples
-        for i, json_path in enumerate(json_files, 1):
+        for json_path in json_files:
+            filename = os.path.splitext(os.path.basename(json_path))[0]
+
             ctk.CTkButton(scroll, 
-                        text=f"Example {i}",
+                        text=filename,
                         font=("Arial", 15),  
                         height=30, 
                         fg_color=SECONDARY,

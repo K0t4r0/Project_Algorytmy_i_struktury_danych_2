@@ -1,6 +1,8 @@
 import math
 import json
 import random
+import os
+import glob
 
 class DwarfDataGenerator:
     def __init__(self, names_file="tools/names.json", custom_config=None):
@@ -67,6 +69,18 @@ class DwarfDataGenerator:
                 
         print(f"Warning: The map is too dense! Unable to find a position with a distance of {min_dist}.")
         return pos
+    
+    def _next_example_path(self, folder="json"):
+        existing = glob.glob(os.path.join(folder, "Example *.json"))
+        indices = []
+        for path in existing:
+            basename = os.path.splitext(os.path.basename(path))[0]
+            parts = basename.split(" ")
+            if len(parts) == 2 and parts[1].isdigit():
+                indices.append(int(parts[1]))
+ 
+        next_i = max(indices) + 1 if indices else 1
+        return os.path.join(folder, f"Example {next_i}.json")
 
     def generate(self):
         num_dwarves = random.randint(self.config["min_dwarves"], self.config["max_dwarves"])
@@ -77,8 +91,8 @@ class DwarfDataGenerator:
         random.shuffle(available_names)
 
         occupied_positions = []
-        dwarves = []
 
+        dwarves = []
         for i in range(1, num_dwarves + 1):
             name = available_names.pop() if available_names else f"Dwarf_{i}"
             
@@ -108,7 +122,14 @@ class DwarfDataGenerator:
                 "pos": pos
             })
 
-        guards = [random.randint(self.config["min_loudness"], self.config["max_loudness"]) for _ in range(num_guards)]
+        guards = []
+        for i in range(1, num_guards + 1):
+            name = available_names.pop() if available_names else f"Guard_{i}"
+            guards.append({
+                "id": 100 + i,
+                "name": name,
+                "loudness": random.randint(self.config["min_loudness"], self.config["max_loudness"])
+            })
 
         return {
             "dwarves": dwarves,
@@ -116,31 +137,14 @@ class DwarfDataGenerator:
             "guards": guards
         }
 
-    def generate_and_save(self, output_file="json/generator_test.json"):
+    def generate_and_save(self, output_file=None):
+        if output_file is None:
+            output_file = self._next_example_path()
+ 
         data = self.generate()
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        print(f"The data has been successfully generated and saved in '{output_file}'")
-        return data
-
-
-# ==========================================
-# Example
-# ==========================================
-if __name__ == "__main__":
-    generator = DwarfDataGenerator() 
-    # if you want to use custom config
-    # create dict 
-    # conf = {
-    #         "min_dwarves": 100,
-    #         "max_dwarves": 500,
-    #         "min_mines": 50,
-    #         "max_mines": 200,
-    #         "min_guards": 100,
-    #         "max_guards": 500,
-    #         "grid_size": 1000,
-    # }
-    # and use custom_config=...
-    # ... = DwarfDataGenerator(custom_config=conf) 
-
-    generator.generate_and_save() # You can use output_file="..."
+ 
+        print(f"Data saved to '{output_file}'")
+        return output_file, data

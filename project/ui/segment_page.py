@@ -3,12 +3,13 @@ import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import json_files
+from tools.draw import get_json_files
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from tools.data_manager import data_store
 from algorithms.segment import get_border_mines, place_guards, SparseTable, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
 import os
+from algorithms.hull import jarvis
 
 class SegmentPage(ctk.CTkFrame):
 
@@ -27,19 +28,11 @@ class SegmentPage(ctk.CTkFrame):
 
         ctk.CTkLabel(left_frame, text="Border Guards", font=("Arial", 30, "bold")).pack(pady=20)
 
-        scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
-        scroll.pack(fill="both", expand=True, padx=20, pady=(5, 5))
+        self.scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
+        self.scroll.pack(fill="both", expand=True, padx=20, pady=(5, 5))
 
         # Examples
-        for json_path in json_files:
-            filename = os.path.splitext(os.path.basename(json_path))[0]
-            ctk.CTkButton(scroll,
-                          text=filename,
-                          font=("Arial", 15),
-                          height=30,
-                          fg_color=SECONDARY,
-                          command=lambda p=json_path: self.load_example(p)
-                          ).pack(pady=5, padx=(5, 10), fill="x")
+        self.refresh_examples()
 
         ctk.CTkButton(left_frame, text="Back", font=("Arial", 20),
                       command=lambda: controller.show_frame("MainMenu")
@@ -193,14 +186,12 @@ class SegmentPage(ctk.CTkFrame):
 
     # Drawing mines
     def _draw_mines(self, ax):
-        for m in data_store.mines:
-            mine_type = data_store.get_mine_type(m.id)
-            m_color = MINE_COLORS.get(mine_type)
-            ax.plot(m.pos[0], m.pos[1], 'o',
-                    color=m_color, ms=14, mec='white', mew=1, zorder=3)
-            ax.annotate(m.id, xy=m.pos,
-                        xytext=(4, 5), textcoords='offset points',
-                        color='white', fontsize=7, zorder=4)
+        points = [m.pos for m in data_store.mines]
+        mines =  jarvis(points)
+
+        for m in mines:
+            ax.plot(m[0], m[1], 'o',
+                    color="gray", ms=14, mec='white', mew=1, zorder=3)
 
     # Drawing hull filling
     def _draw_hull_fill(self, ax):
@@ -394,3 +385,20 @@ class SegmentPage(ctk.CTkFrame):
             )
 
         self._set_info(info)
+
+    def refresh_examples(self):
+
+        for widget in self.scroll.winfo_children():
+            widget.destroy()
+
+        for json_path in get_json_files():
+            filename = os.path.splitext(os.path.basename(json_path))[0]
+
+            ctk.CTkButton(
+                self.scroll,
+                text=filename,
+                font=("Arial", 15),
+                height=30,
+                fg_color=SECONDARY,
+                command=lambda p=json_path: self.load_example(p)
+            ).pack(pady=5, padx=(5, 10), fill="x")

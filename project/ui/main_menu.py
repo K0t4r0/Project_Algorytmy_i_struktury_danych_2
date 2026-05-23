@@ -14,15 +14,21 @@ class MainMenu(ctk.CTkFrame):
             self,
             text="Choose an algorithm to visualize",
             font=("Arial", 18)
-        ).pack(pady=(0, 30))
+        ).pack()
+
+        ctk.CTkButton(
+                self,
+                text="Generate Data",
+                command=lambda: controller.show_frame("GeneratorPage")
+            ).pack(pady=(15,5))
 
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(expand=True)
 
         items = [
-            ("Flow", "Max flow algorithms", "FlowPage"),
+            ("Flow", "Min cost - max flow \nalgorithm", "FlowPage"),
             ("Convex Hull", "Geometry algorithms", "HullPage"),
-            ("Segment Tree", "Range queries", "SegmentPage"),
+            ("Segment", "Range queries", "SegmentPage"),
             ("Compression", "Union-Find & paths", "CompressionPage")
         ]
 
@@ -33,7 +39,7 @@ class MainMenu(ctk.CTkFrame):
                 height=140,
                 corner_radius=15
             )
-            card.grid(row=i//2, column=i%2, padx=20, pady=20)
+            card.grid(row=i//2, column=i%2, padx=20, pady=10)
             card.grid_propagate(False)
 
             ctk.CTkLabel(

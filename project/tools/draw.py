@@ -1,9 +1,16 @@
 from ui.colors import *
 from pathlib import Path
 from tools.data_manager import data_store
+import re
 
-examples_path = Path("json/")
-json_files = sorted(examples_path.glob("*.json"))
+# Get all json files in project
+def get_json_files():
+    examples_path = Path("json/")
+
+    return sorted(
+        examples_path.glob("*.json"),
+        key=lambda p: int(re.search(r"\d+", p.stem).group())
+    )
 
 # Loading json file
 def select_example(json_path, canvas):

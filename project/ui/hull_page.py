@@ -2,10 +2,11 @@ import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import json_files, draw_sub_hull
+from tools.draw import draw_sub_hull, get_json_files
 from tools.data_manager import data_store
-from algorithms.hull import graham_generator, jarvis_generator
+from algorithms.hull import graham_generator, jarvis_generator, jarvis, graham_scan
 import os
+import time
 
 class HullPage(ctk.CTkFrame):
     
@@ -17,6 +18,7 @@ class HullPage(ctk.CTkFrame):
         self.is_animating = False
         self.hull_gen = None
         self.selected_alg = "graham"
+        self.res1, self.res2 = 0, 0
 
         left_frame = ctk.CTkFrame(self, 
                      width=200,
@@ -28,20 +30,11 @@ class HullPage(ctk.CTkFrame):
         ctk.CTkLabel(left_frame, text="Convex Hull", font=("Arial", 30, "bold")).pack(pady=20)
 
         #Scrollbar frame
-        scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
-        scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
+        self.scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
+        self.scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
 
         #Examples
-        for json_path in json_files:
-            filename = os.path.splitext(os.path.basename(json_path))[0]
-
-            ctk.CTkButton(scroll,
-                        text=filename,
-                        font=("Arial", 15),  
-                        height=30, 
-                        fg_color=SECONDARY,
-                        command=lambda p=json_path: self.load_new_example(p)
-                        ).pack(pady=5, padx=(5,10), fill="x")
+        self.refresh_examples()
 
         #Return button to Main menu
         ctk.CTkButton(left_frame,
@@ -76,6 +69,7 @@ class HullPage(ctk.CTkFrame):
             text="Choose example",
             wraplength=200
         )
+
         self.info_label.pack(pady=10, padx=10)
 
 
@@ -123,7 +117,38 @@ class HullPage(ctk.CTkFrame):
     # Functions for animation
     def load_new_example(self, path):
         self.reset_logic()
+        
         data_store.load_from_json(path)
+        points = [m.pos for m in data_store.mines]
+
+        start_j = time.time()
+        jarvis(points)
+        end_j = time.time()
+        self.res1 = end_j - start_j
+
+        start_g = time.time()
+        graham_scan(points)
+        end_g = time.time()
+        self.res2 = end_g - start_g
+
+        if self.res1 < self.res2:
+            diff = self.res2 - self.res1
+            ratio = self.res2 / self.res1 if self.res1 > 0 else 0
+            faster = f"Jarvis is {ratio:.2f}x faster\n({diff:.6f} sec difference)"
+        elif self.res2 < self.res1:
+            diff = self.res1 - self.res2
+            ratio = self.res1 / self.res2 if self.res2 > 0 else 0
+            faster = f"Graham is {ratio:.2f}x faster\n({diff:.6f} sec difference)"
+        else:
+            faster = "Algorithms have equal time"
+        self.info_label.configure(
+            text=(
+                f"Jarvis: {self.res1:.6f} sec\n"
+                f"Graham: {self.res2:.6f} sec\n\n"
+                f"{faster}"
+            )
+        )
+
         self.apply_step()
 
     # Toggle button for switching modes
@@ -207,4 +232,21 @@ class HullPage(ctk.CTkFrame):
         self.graham_gen = None
         self.jarvis_gen = None
         self.toggle_btn.configure(text="Start Animation")
+    
+    def refresh_examples(self):
+
+        for widget in self.scroll.winfo_children():
+            widget.destroy()
+
+        for json_path in get_json_files():
+            filename = os.path.splitext(os.path.basename(json_path))[0]
+
+            ctk.CTkButton(
+                self.scroll,
+                text=filename,
+                font=("Arial", 15),
+                height=30,
+                fg_color=SECONDARY,
+                command=lambda p=json_path: self.load_new_example(p)
+            ).pack(pady=5, padx=(5, 10), fill="x")
         

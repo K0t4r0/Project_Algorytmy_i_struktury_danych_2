@@ -5,6 +5,7 @@ from ui.flow_page import FlowPage
 from ui.hull_page import HullPage
 from ui.segment_page import SegmentPage
 from ui.compression_page import CompressionPage
+from ui.generate_page import GeneratorPage
 
 
 class App(ctk.CTk):
@@ -24,7 +25,7 @@ class App(ctk.CTk):
 
         self.frames = {}
 
-        for F in (MainMenu, FlowPage, HullPage, SegmentPage, CompressionPage):
+        for F in (MainMenu, FlowPage, HullPage, SegmentPage, CompressionPage, GeneratorPage):
             frame = F(container, self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -42,10 +43,14 @@ class App(ctk.CTk):
         self.geometry(f"{width}x{height}+{x}+{y}")
     def show_frame(self, name):
         frame = self.frames[name]
+        if hasattr(frame, "refresh_examples"):
+            frame.refresh_examples()
         frame.tkraise()
 
         if name == "MainMenu":
             self.center_window(600, 500)
+        elif name == "GeneratorPage":
+            self.center_window(710, 590)
         else:
-            self.center_window(1200, 600)
+            self.center_window(1200, 550)
         self.update_idletasks()

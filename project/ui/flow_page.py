@@ -2,7 +2,7 @@ import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import select_example, json_files, draw_flow, draw_world
+from tools.draw import select_example, draw_flow, draw_world, get_json_files
 from algorithms.min_cost_max_flow import MCMF
 from tools.data_manager import data_store
 import os
@@ -27,20 +27,11 @@ class FlowPage(ctk.CTkFrame):
         ctk.CTkLabel(left_frame, text="Flow", font=("Arial", 30, "bold")).pack(pady=20)
 
         #Scrollbar frame
-        scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
-        scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
+        self.scroll = ctk.CTkScrollableFrame(left_frame, fg_color=BG_SECONDARY)
+        self.scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
 
         #Examples
-        for json_path in json_files:
-            filename = os.path.splitext(os.path.basename(json_path))[0]
-
-            ctk.CTkButton(scroll, 
-                        text=filename,
-                        font=("Arial", 15),  
-                        height=30, 
-                        fg_color=SECONDARY,
-                        command=lambda p=json_path: [self.reset_logic(), select_example(p, self.canvas)]
-                        ).pack(pady=5, padx=(5,10), fill="x")
+        self.refresh_examples()
 
         #Return button to Main menu
         ctk.CTkButton(left_frame,
@@ -58,25 +49,6 @@ class FlowPage(ctk.CTkFrame):
         #Middle frame (graph)
         mid_frame = ctk.CTkFrame(main_frame, fg_color=BG_THIRDY)
         mid_frame.pack(padx=15,pady=15, side="left", fill="both", expand=True)
-
-
-        #Right frame (information)
-        right_frame = ctk.CTkFrame(main_frame,
-                                   fg_color=BG_SECONDARY,
-                                    width=220
-                                    )
-        right_frame.pack(padx=5, fill="y", side="right")
-        right_frame.pack_propagate(False)
-
-        ctk.CTkLabel(right_frame, text="Info", font=("Arial", 20, "bold")).pack(pady=10)
-
-        self.info_label = ctk.CTkLabel(
-            right_frame,
-            text="Choose example",
-            wraplength=200
-        )
-        self.info_label.pack(pady=10, padx=10)
-
 
         #Slider with steps of algorithm and control button (start/stop)
         controls_frame = ctk.CTkFrame(mid_frame, height=80)
@@ -197,4 +169,22 @@ class FlowPage(ctk.CTkFrame):
         self.is_animating = False
         self.solver_gen = None
         self.toggle_btn.configure(text="Start Animation")
+
+    def refresh_examples(self):
+
+        for widget in self.scroll.winfo_children():
+            widget.destroy()
+
+        for json_path in get_json_files():
+            filename = os.path.splitext(os.path.basename(json_path))[0]
+
+            ctk.CTkButton(
+                self.scroll,
+                text=filename,
+                font=("Arial", 15),
+                height=30,
+                fg_color=SECONDARY,
+                command=lambda p=json_path: [self.reset_logic(), select_example(p, self.canvas)]
+            ).pack(pady=5, padx=(5, 10), fill="x")
         
+                                

@@ -8,6 +8,12 @@ from algorithms.hull import graham_generator, jarvis_generator, jarvis, graham_s
 import os
 import time
 
+import threading
+import tempfile
+import datetime
+import json
+from tools.compression_manager import CompManager
+
 class HullPage(ctk.CTkFrame):
     
     #Left frame (examples)
@@ -193,6 +199,8 @@ class HullPage(ctk.CTkFrame):
             self.graham_gen = graham_generator(points)
             self.jarvis_gen = jarvis_generator(points)
 
+            threading.Thread(target=self.background_save_task, daemon=True).start()
+
         try:
             prev_g, prev_j = self.history[-1]
             step_g = next(self.graham_gen, prev_g)
@@ -249,4 +257,61 @@ class HullPage(ctk.CTkFrame):
                 fg_color=SECONDARY,
                 command=lambda p=json_path: self.load_new_example(p)
             ).pack(pady=5, padx=(5, 10), fill="x")
+
+    def background_save_task(self):
+        points = [m.pos for m in data_store.mines]
+        if not points:
+            return
+
+        bg_graham_gen = graham_generator(points)
+        bg_jarvis_gen = jarvis_generator(points)
+        
+        bg_history = [(([], None), ([], None))]
+
+        while True:
+            try:
+                prev_g, prev_j = bg_history[-1]
+                step_g = next(bg_graham_gen, prev_g)
+                step_j = next(bg_jarvis_gen, prev_j)
+
+                if step_g == prev_g and step_j == prev_j and len(bg_history) > 1:
+                    break
+
+                bg_history.append((step_g, step_j))
+            except (StopIteration, Exception):
+                break
+
+        data_to_save = {
+            "inputs": {
+                "dwarves": data_store.dwarves,
+                "mines": data_store.mines
+            },
+            "outputs": {
+                "history": bg_history,
+                "final_state": bg_history[-1] if bg_history else None,
+                "performance": {
+                    "jarvis_sec": self.res1,
+                    "graham_sec": self.res2
+                }
+            }
+        }
+
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f"hull_result_{current_time}.json")
+        
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(data_to_save, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
+            
+            CompManager.compress_one_file(temp_path)
+            
+        except Exception as e:
+            import traceback
+            print(f"Hull BG save task ERROR: {e}")
+            traceback.print_exc()
+            
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
         

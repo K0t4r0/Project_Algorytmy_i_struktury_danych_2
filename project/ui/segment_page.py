@@ -11,6 +11,12 @@ from algorithms.segment import get_border_mines, place_guards, SparseTable, find
 import os
 from algorithms.hull import jarvis
 
+import threading
+import tempfile
+import datetime
+import json
+from tools.compression_manager import CompManager
+
 class SegmentPage(ctk.CTkFrame):
 
     def __init__(self, parent, controller):
@@ -128,6 +134,9 @@ class SegmentPage(ctk.CTkFrame):
             f"Press ATTACK to simulate an apple-smuggling raid."
         )
         self._draw_border()
+
+        if self.guards and self.hull_mines:
+            threading.Thread(target=self.background_save_task, daemon=True).start()
 
     def _draw_legend(self, ax, show_attack=False, show_winner=False):
         entries = []
@@ -402,3 +411,36 @@ class SegmentPage(ctk.CTkFrame):
                 fg_color=SECONDARY,
                 command=lambda p=json_path: self.load_example(p)
             ).pack(pady=5, padx=(5, 10), fill="x")
+
+    def background_save_task(self):
+        data_to_save = {
+            "inputs": {
+                "dwarves": getattr(data_store, "dwarves", []),
+                "mines": getattr(data_store, "mines", []),
+                "guards": getattr(data_store, "guards", [])
+            },
+            "outputs": {
+                "hull_mines": self.hull_mines,
+                "placed_guards": self.guards,
+                "step_meters": self.step_m
+            }
+        }
+
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f"segment_result_{current_time}.json")
+        
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(data_to_save, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
+            
+            CompManager.compress_one_file(temp_path)
+            
+        except Exception as e:
+            import traceback
+            print(f"Segment BG save task ERROR: {e}")
+            traceback.print_exc()
+            
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)

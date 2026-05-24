@@ -1,4 +1,5 @@
 import os
+import textwrap
 import customtkinter as ctk
 
 from tools.compression_manager import CompManager 
@@ -87,9 +88,11 @@ class CompressionPage(ctk.CTkFrame):
 
         files = [f for f in os.listdir(compressed_dir) if f.endswith(".kra")]
         for f in files:
+            display_text = textwrap.fill(f, width=20, break_long_words=True)
+
             ctk.CTkButton(
                 self.scroll, 
-                text=f, 
+                text=display_text, 
                 font=("Arial", 15),  
                 height=30, 
                 fg_color=SECONDARY,

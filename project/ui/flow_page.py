@@ -1,4 +1,9 @@
+import datetime
+import tempfile
+import json
+import threading
 import customtkinter as ctk
+from tools.compression_manager import CompManager
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
@@ -144,6 +149,8 @@ class FlowPage(ctk.CTkFrame):
             self.solver.build_network()
             self.solver_gen = self.solver.solve_generator()
 
+            threading.Thread(target=self.background_save_task, daemon=True).start()
+
         try:
             new_paths = next(self.solver_gen)
             self.history.append(new_paths)
@@ -187,4 +194,38 @@ class FlowPage(ctk.CTkFrame):
                 command=lambda p=json_path: [self.reset_logic(), select_example(p, self.canvas)]
             ).pack(pady=5, padx=(5, 10), fill="x")
         
-                                
+    def background_save_task(self):
+        bg_solver = MCMF(data_store.dwarves, data_store.mines)
+        bg_solver.build_network()
+        
+        bg_history = [[]]
+        for paths in bg_solver.solve_generator():
+            bg_history.append(paths)
+
+        data_to_save = {
+            "inputs": {
+                "dwarves": data_store.dwarves,
+                "mines": data_store.mines
+            },
+            "outputs": {
+                "history": bg_history,
+                "final_paths": bg_history[-1] if bg_history else []
+            }
+        }
+
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f"flow_result_{current_time}.json")
+        
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(data_to_save, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
+            
+            CompManager.compress_one_file(temp_path)
+            
+        except Exception as e:
+            print(f"BG save task ERROR: {e}")
+            
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)        

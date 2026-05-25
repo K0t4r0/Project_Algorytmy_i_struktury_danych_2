@@ -1,5 +1,7 @@
 import os
-import textwrap
+import time
+import json
+import datetime
 import customtkinter as ctk
 
 from tools.compression_manager import CompManager 
@@ -16,9 +18,8 @@ class CompressionPage(ctk.CTkFrame):
         self.pattern_length = 0
 
         self.setup_left_frame()
+        self.refresh_examples()
         self.setup_main_frame()
-        
-        self.refresh_file_list()
 
     def setup_left_frame(self):
         self.left_frame = ctk.CTkFrame(self, width=200, fg_color=BG_SECONDARY, corner_radius=0)
@@ -28,9 +29,6 @@ class CompressionPage(ctk.CTkFrame):
 
         self.scroll = ctk.CTkScrollableFrame(self.left_frame, fg_color=BG_SECONDARY)
         self.scroll.pack(fill="both", expand=True, padx=20, pady=(5,5))
-
-        ctk.CTkButton(self.left_frame, text="Refresh", font=("Arial", 15),
-                      command=self.refresh_file_list).pack(pady=(0, 5), padx=20, fill="x")
 
         ctk.CTkButton(self.left_frame, text="Back", font=("Arial", 20),
                       command=lambda: self.controller.show_frame("MainMenu")).pack(pady=10)
@@ -77,7 +75,7 @@ class CompressionPage(ctk.CTkFrame):
         self.info_label = ctk.CTkLabel(right_frame, text="Choose a file to decompress", wraplength=200)
         self.info_label.pack(pady=10, padx=10)
 
-    def refresh_file_list(self):
+    def refresh_examples(self):
         for widget in self.scroll.winfo_children():
             widget.destroy()
 
@@ -88,14 +86,33 @@ class CompressionPage(ctk.CTkFrame):
 
         files = [f for f in os.listdir(compressed_dir) if f.endswith(".kra")]
         for f in files:
-            display_text = textwrap.fill(f, width=20, break_long_words=True)
+            filename = os.path.basename(f)
+
+            if filename.startswith("flow_"):
+                alg_name = "Flow (MCMF)"
+            elif filename.startswith("hull_"):
+                alg_name = "Convex Hull"
+            elif filename.startswith("segment_"):
+                alg_name = "Border Guards"
+            else:
+                alg_name = "Unknown Algorithm"
+
+            try:
+                timestamp = os.path.getctime(os.path.join(compressed_dir, f))
+                date_str = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d at %H:%M:%S")
+            except Exception as e:
+                print("WRONG timestamp in comp page:", e)
+                date_str = "Unknown Date"
+
+            display_text = f"{alg_name}\n\n{date_str}"
 
             ctk.CTkButton(
                 self.scroll, 
                 text=display_text, 
-                font=("Arial", 15),  
-                height=30, 
+                font=("Arial", 14), 
+                height=70,          
                 fg_color=SECONDARY,
+                anchor="w", 
                 command=lambda fname=f: self.load_and_decompress(fname)
             ).pack(pady=5, padx=10, fill="x")
 
@@ -110,8 +127,20 @@ class CompressionPage(ctk.CTkFrame):
             out_name = filename.replace(".kra", "").replace("_", ".", 1)
             self.current_decompressed_path = os.path.join("decompressed_data", out_name)
 
-            with open(self.current_decompressed_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            try:
+                with open(self.current_decompressed_path, 'r', encoding='utf-8') as f:
+                    raw_content = f.read()
+
+                parsed_json = json.loads(raw_content)
+                content = json.dumps(parsed_json, indent=4, ensure_ascii=False)
+
+                with open(self.current_decompressed_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+            except json.JSONDecodeError:
+                content = raw_content
+            except Exception as e:
+                content = f"Error reading file: {e}"
 
             self.textbox.delete("1.0", "end")
             self.textbox.insert("1.0", content)

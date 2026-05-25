@@ -12,6 +12,8 @@ from algorithms.min_cost_max_flow import MCMF
 from tools.data_manager import data_store, DataManager
 import os
 import copy
+import hashlib
+
 
 class FlowPage(ctk.CTkFrame):
     
@@ -147,16 +149,15 @@ class FlowPage(ctk.CTkFrame):
             return True
         
         if self.solver_gen is None:
-            self.solver = MCMF(data_store.dwarves, data_store.mines)
+            self.solver = MCMF(data_store.dwarves, data_store.mines, data_store)
             self.solver.build_network()
             self.solver_gen = self.solver.solve_generator()
 
-            dwarves_copy = copy.deepcopy(data_store.dwarves)
-            mines_copy = copy.deepcopy(data_store.mines)
+            data_store_copy = copy.deepcopy(data_store)
 
             threading.Thread(
                 target=self.background_save_task,
-                args=(dwarves_copy, mines_copy),
+                args=[data_store_copy],
                 daemon=True
             ).start()
 
@@ -176,7 +177,18 @@ class FlowPage(ctk.CTkFrame):
             self.apply_step()
 
     def apply_step(self):
-        data_store.flow_paths = self.history[self.current_idx]
+        if not self.history or not self.history[self.current_idx]:
+            data_store.flow_paths = []
+            draw_flow(self.canvas)
+            return
+            
+        step_data = self.history[self.current_idx]
+        
+        if isinstance(step_data, dict):
+            data_store.flow_paths = step_data["paths"]
+        else:
+            data_store.flow_paths = step_data 
+            
         draw_flow(self.canvas)
 
     def reset_logic(self):
@@ -204,8 +216,9 @@ class FlowPage(ctk.CTkFrame):
                 command=lambda p=json_path: [self.reset_logic(), select_example(p, self.canvas)]
             ).pack(pady=5, padx=(5, 10), fill="x")
         
-    def background_save_task(self, dwarves, mines):
-        bg_solver = MCMF(dwarves, mines)
+
+    def background_save_task(self, data_store_copy):
+        bg_solver = MCMF(data_store_copy.dwarves, data_store_copy.mines, data_store_copy)
         bg_solver.build_network()
         
         bg_history = [[]]
@@ -214,8 +227,8 @@ class FlowPage(ctk.CTkFrame):
 
         data_to_save = {
             "inputs": {
-                "dwarves": dwarves,
-                "mines": mines
+                "dwarves": data_store_copy.dwarves,
+                "mines": data_store_copy.mines
             },
             "outputs": {
                 "history": bg_history,
@@ -223,19 +236,29 @@ class FlowPage(ctk.CTkFrame):
             }
         }
 
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        data_str = json.dumps(data_to_save, ensure_ascii=False, sort_keys=True, default=lambda o: o.__dict__)
+        data_hash = hashlib.sha256(data_str.encode('utf-8')).hexdigest()[:16]
+
+        final_kra_name = f"flow_result_{data_hash}_json.kra"
+        final_kra_path = os.path.join("compressed_data", final_kra_name)
+
+        if os.path.exists(final_kra_path):
+            print(f"The {final_kra_name} archive already exists")
+            return
+
         temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"flow_result_{current_time}.json")
+        temp_path = os.path.join(temp_dir, f"flow_result_{data_hash}.json")
         
         try:
             with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(data_to_save, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
+                f.write(data_str)
             
             CompManager.compress_one_file(temp_path)
+            print(f"The new archive has been successfully compressed and saved: {final_kra_name}")
             
         except Exception as e:
             print(f"BG save task ERROR: {e}")
             
         finally:
             if os.path.exists(temp_path):
-                os.remove(temp_path)        
+                os.remove(temp_path)

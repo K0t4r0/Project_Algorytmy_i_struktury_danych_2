@@ -1,4 +1,5 @@
 import random
+import hashlib
 import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -27,6 +28,7 @@ class SegmentPage(ctk.CTkFrame):
         self.step_m = 1.0
         self.table = None
         self.current_path = None
+        self.current_log_name = None
 
         # Left frame (examples)
         left_frame = ctk.CTkFrame(self, width=200, fg_color=BG_SECONDARY, corner_radius=0)
@@ -135,8 +137,24 @@ class SegmentPage(ctk.CTkFrame):
         )
         self._draw_border()
 
+        initial_data = {
+            "inputs": {
+                "dwarves": getattr(data_store, "dwarves", []),
+                "mines": getattr(data_store, "mines", []),
+                "guards": getattr(data_store, "guards", [])
+            },
+            "outputs": {
+                "hull_mines": self.hull_mines,
+                "placed_guards": self.guards,
+                "step_meters": self.step_m
+            }
+        }
+        hash_str = json.dumps(initial_data, ensure_ascii=False, sort_keys=True, default=lambda o: o.__dict__)
+        data_hash = hashlib.sha256(hash_str.encode('utf-8')).hexdigest()[:16]
+        self.current_log_name = f"segment_result_{data_hash}.json"
+
         if self.guards and self.hull_mines:
-            threading.Thread(target=self.background_save_task, daemon=True).start()
+            threading.Thread(target=self.background_save_task, args=[None], daemon=True).start()
 
     def _draw_legend(self, ax, show_attack=False, show_winner=False):
         entries = []
@@ -358,10 +376,20 @@ class SegmentPage(ctk.CTkFrame):
                 f"Loudness: {winner.loudness}\n"
                 f"Position: {winner.position_meters:.1f} m\n"
             )
+            log_msg = f"Attack on edge {mine_from.id} -> {mine_to.id}. Defended by Commander {winner.name} (Loudness: {winner.loudness})."
         else:
             info = f"ATTACK ON EDGE {mine_from.id} → {mine_to.id}\n\nNo guards on this edge."
+            log_msg = f"Attack on edge {mine_from.id} -> {mine_to.id}. Breach! No guards found on this edge."
             
         self._set_info(info)
+
+        attack_event = {
+            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "type": "edge_attack",
+            "details": f"Edge index {edge_idx}",
+            "log": log_msg
+        }
+        threading.Thread(target=self.background_save_task, args=[attack_event], daemon=True).start()
     
     def simulate_attack_by_meters(self):
         if not self.hull_mines or not self.guards or self.table is None:
@@ -386,14 +414,24 @@ class SegmentPage(ctk.CTkFrame):
                 f"Position: {winner.position_meters:.1f} m\n\n"
                 f"{winner.name}: Archers! Draw! Fire!"
             )
+            log_msg = f"Attack range [{from_m:.1f}m -> {to_m:.1f}m]. Defended by Commander {winner.name} (Loudness: {winner.loudness})."
         else:
             info = (
                 f"ATTACK [{from_m:.1f}m → {to_m:.1f}m]\n\n"
                 f"No guards on this segment!\n\n"
                 f"{error if error else 'Empty range'}"
             )
+            log_msg = f"Attack range [{from_m:.1f}m -> {to_m:.1f}m]. Breach! Segment unprotected. Error: {error if error else 'Empty range'}."
 
         self._set_info(info)
+
+        attack_event = {
+            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "type": "meter_attack",
+            "details": f"Range {from_m:.1f}m to {to_m:.1f}m",
+            "log": log_msg
+        }
+        threading.Thread(target=self.background_save_task, args=[attack_event], daemon=True).start()
 
     def refresh_examples(self):
 
@@ -412,35 +450,69 @@ class SegmentPage(ctk.CTkFrame):
                 command=lambda p=json_path: self.load_example(p)
             ).pack(pady=5, padx=(5, 10), fill="x")
 
-    def background_save_task(self):
-        data_to_save = {
-            "inputs": {
-                "dwarves": getattr(data_store, "dwarves", []),
-                "mines": getattr(data_store, "mines", []),
-                "guards": getattr(data_store, "guards", [])
-            },
-            "outputs": {
-                "hull_mines": self.hull_mines,
-                "placed_guards": self.guards,
-                "step_meters": self.step_m
-            }
-        }
+    def background_save_task(self, attack_event=None):
+        if not self.current_log_name:
+            return
 
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"segment_result_{current_time}.json")
+        final_kra_name = self.current_log_name.replace(".", "_", 1) + ".kra"
+        final_kra_path = os.path.join("compressed_data", final_kra_name)
         
+        decompressed_read_name = final_kra_name.replace(".kra", "").replace("_", ".", 1)
+        decompressed_dir = "decompressed_data"
+        decompressed_read_path = os.path.join(decompressed_dir, decompressed_read_name)
+
+        decompressed_write_path = os.path.join(decompressed_dir, self.current_log_name)
+
+        file_data = None
+
         try:
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(data_to_save, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
+            if os.path.exists(final_kra_path):
+                CompManager.decompress_one_file(final_kra_path)
+                
+                if os.path.exists(decompressed_read_path):
+                    with open(decompressed_read_path, 'r', encoding='utf-8') as f:
+                        file_data = json.load(f)
+                    
+                    os.remove(decompressed_read_path)
+        except Exception as e:
+            print("Error during reading old archive:", e)
+
+        if not file_data:
+            file_data = {
+                "inputs": {
+                    "dwarves": getattr(data_store, "dwarves", []),
+                    "mines": getattr(data_store, "mines", []),
+                    "guards": getattr(data_store, "guards", [])
+                },
+                "outputs": {
+                    "hull_mines": self.hull_mines,
+                    "placed_guards": self.guards,
+                    "step_meters": self.step_m,
+                    "attacks_history": []
+                }
+            }
+
+        if "outputs" not in file_data: 
+            file_data["outputs"] = {}
+        if "attacks_history" not in file_data["outputs"]: 
+            file_data["outputs"]["attacks_history"] = []
+
+        if attack_event:
+            file_data["outputs"]["attacks_history"].append(attack_event)
+
+        try:
+            os.makedirs(decompressed_dir, exist_ok=True)
             
-            CompManager.compress_one_file(temp_path)
+            with open(decompressed_write_path, 'w', encoding='utf-8') as f:
+                json.dump(file_data, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
+            
+            CompManager.compress_one_file(decompressed_write_path)
             
         except Exception as e:
             import traceback
-            print(f"Segment BG save task ERROR: {e}")
+            print(f"Segment BG append task ERROR: {e}")
             traceback.print_exc()
             
         finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            if os.path.exists(decompressed_write_path):
+                os.remove(decompressed_write_path)

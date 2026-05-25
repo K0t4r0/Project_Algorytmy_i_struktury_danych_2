@@ -10,7 +10,7 @@ import time
 
 import threading
 import tempfile
-import datetime
+import hashlib
 import json
 from tools.compression_manager import CompManager
 
@@ -266,20 +266,52 @@ class HullPage(ctk.CTkFrame):
         bg_graham_gen = graham_generator(points)
         bg_jarvis_gen = jarvis_generator(points)
         
-        bg_history = [(([], None), ([], None))]
+        bg_history = []
+        step_count = 1
 
         while True:
             try:
-                prev_g, prev_j = bg_history[-1]
+                if bg_history:
+                    prev_g, prev_j = bg_history[-1]["state"]
+                else:
+                    prev_g, prev_j = ([], None), ([], None)
+
                 step_g = next(bg_graham_gen, prev_g)
                 step_j = next(bg_jarvis_gen, prev_j)
 
-                if step_g == prev_g and step_j == prev_j and len(bg_history) > 1:
+                if step_g == prev_g and step_j == prev_j and len(bg_history) > 0:
                     break
 
-                bg_history.append((step_g, step_j))
+                graham_points = step_g[0]
+                jarvis_points = step_j[0]
+
+                g_action = f"Graham Scan: Hull contains {len(graham_points)} points."
+                if step_g[1]:
+                    g_action += f" Testing point at {step_g[1]}."
+
+                j_action = f"Jarvis March: Hull contains {len(jarvis_points)} points."
+                if step_j[1]:
+                    j_action += f" Scanning current point at {step_j[1]}."
+
+                step_data = {
+                    "step": step_count,
+                    "graham_log": g_action,
+                    "jarvis_log": j_action,
+                    "state": (step_g, step_j)
+                }
+
+                bg_history.append(step_data)
+                step_count += 1
+
             except (StopIteration, Exception):
                 break
+
+        bg_history.insert(0, {
+            "step": 0,
+            "graham_log": "Graham Scan initialized.",
+            "jarvis_log": "Jarvis March initialized.",
+            "state": (([], None), ([], None))
+        })
 
         data_to_save = {
             "inputs": {
@@ -288,7 +320,7 @@ class HullPage(ctk.CTkFrame):
             },
             "outputs": {
                 "history": bg_history,
-                "final_state": bg_history[-1] if bg_history else None,
+                "final_state": bg_history[-1]["state"] if bg_history else None,
                 "performance": {
                     "jarvis_sec": self.res1,
                     "graham_sec": self.res2
@@ -296,15 +328,25 @@ class HullPage(ctk.CTkFrame):
             }
         }
 
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        hash_str = json.dumps(data_to_save, ensure_ascii=False, sort_keys=True, separators=(',', ':'), default=lambda o: o.__dict__)
+        data_hash = hashlib.sha256(hash_str.encode('utf-8')).hexdigest()[:16]
+
+        final_kra_name = f"hull_result_{data_hash}_json.kra"
+        final_kra_path = os.path.join("compressed_data", final_kra_name)
+
+        if os.path.exists(final_kra_path):
+            print(f"The {final_kra_name} archive already exists")
+            return
+
         temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"hull_result_{current_time}.json")
+        temp_path = os.path.join(temp_dir, f"hull_result_{data_hash}.json")
         
         try:
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(data_to_save, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
             
             CompManager.compress_one_file(temp_path)
+            print(f"The new archive has been successfully compressed and saved: {final_kra_name}")
             
         except Exception as e:
             import traceback
@@ -314,4 +356,3 @@ class HullPage(ctk.CTkFrame):
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-        

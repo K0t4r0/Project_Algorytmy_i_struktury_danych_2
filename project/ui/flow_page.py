@@ -9,8 +9,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
 from tools.draw import select_example, draw_flow, draw_world, get_json_files
 from algorithms.min_cost_max_flow import MCMF
-from tools.data_manager import data_store
+from tools.data_manager import data_store, DataManager
 import os
+import copy
 
 class FlowPage(ctk.CTkFrame):
     
@@ -21,6 +22,7 @@ class FlowPage(ctk.CTkFrame):
         self.current_idx = 0
         self.is_animating = False
         self.solver_gen = None
+        self.json_path = None
 
         left_frame = ctk.CTkFrame(self, 
                      width=200,
@@ -149,7 +151,14 @@ class FlowPage(ctk.CTkFrame):
             self.solver.build_network()
             self.solver_gen = self.solver.solve_generator()
 
-            threading.Thread(target=self.background_save_task, daemon=True).start()
+            dwarves_copy = copy.deepcopy(data_store.dwarves)
+            mines_copy = copy.deepcopy(data_store.mines)
+
+            threading.Thread(
+                target=self.background_save_task,
+                args=(dwarves_copy, mines_copy),
+                daemon=True
+            ).start()
 
         try:
             new_paths = next(self.solver_gen)
@@ -184,6 +193,7 @@ class FlowPage(ctk.CTkFrame):
 
         for json_path in get_json_files():
             filename = os.path.splitext(os.path.basename(json_path))[0]
+            self.json_path = json_path
 
             ctk.CTkButton(
                 self.scroll,
@@ -194,18 +204,18 @@ class FlowPage(ctk.CTkFrame):
                 command=lambda p=json_path: [self.reset_logic(), select_example(p, self.canvas)]
             ).pack(pady=5, padx=(5, 10), fill="x")
         
-    def background_save_task(self):
-        bg_solver = MCMF(data_store.dwarves, data_store.mines)
+    def background_save_task(self, dwarves, mines):
+        bg_solver = MCMF(dwarves, mines)
         bg_solver.build_network()
         
         bg_history = [[]]
-        for paths in bg_solver.solve_generator():
+        for paths in bg_solver.solve_generator(is_use_gui=False):
             bg_history.append(paths)
 
         data_to_save = {
             "inputs": {
-                "dwarves": data_store.dwarves,
-                "mines": data_store.mines
+                "dwarves": dwarves,
+                "mines": mines
             },
             "outputs": {
                 "history": bg_history,

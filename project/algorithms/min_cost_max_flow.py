@@ -80,7 +80,7 @@ class MCMF:
 
         data_store.flow_paths = paths
 
-    def solve_generator(self):
+    def solve_generator(self, is_use_gui=True):
         while True:
             result = bellman_ford(self.graph, self.nodes_count, self.S, self.T)
             if result is None or result[0][self.T] == float('inf'):
@@ -95,6 +95,7 @@ class MCMF:
                 self.graph[rev_idx][2] += 1
                 curr = parent[curr]
                 
-            self.update_store_paths()
+            if is_use_gui:
+                self.update_store_paths()
             current_step_paths = list(data_store.flow_paths)
             yield current_step_paths

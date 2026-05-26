@@ -10,13 +10,15 @@ from matplotlib.patches import Patch
 from tools.data_manager import data_store
 from algorithms.segment import get_border_mines, place_guards, SparseTable, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
 import os
+import threading
 from algorithms.hull import jarvis
-
 import threading
 import tempfile
 import datetime
 import json
 from tools.compression_manager import CompManager
+
+_save_lock = threading.Lock() 
 
 class SegmentPage(ctk.CTkFrame):
 
@@ -27,6 +29,8 @@ class SegmentPage(ctk.CTkFrame):
         self.guards = []
         self.step_m = 1.0
         self.table = None
+        self._edge_info  = ""
+        self._meter_info = ""
         self.current_path = None
         self.current_log_name = None
 
@@ -57,7 +61,8 @@ class SegmentPage(ctk.CTkFrame):
         graph_frame.pack(fill="both", expand=True, padx=20, pady=(20, 10))
 
         self.fig = Figure(figsize=(6, 4), dpi=100, facecolor=BG_THIRDY)
-        self.ax  = self.fig.add_subplot(111)
+        self.ax_edge  = self.fig.add_subplot(211)
+        self.ax_meter = self.fig.add_subplot(212)
         self.fig.subplots_adjust(left=0.08, right=0.95, top=0.95, bottom=0.08)
 
         self.canvas = FigureCanvasTkAgg(self.fig, graph_frame)
@@ -75,8 +80,7 @@ class SegmentPage(ctk.CTkFrame):
             height=30,
             fg_color=PRIMARY,
             hover_color=PRIMARY_HOVER,
-            #command=self.simulate_edge_attack,
-            command=self.simulate_attack_by_meters,
+            command=self._simulate_both,
             state="disabled"
         )
         self.attack_btn.pack(fill="x", padx=20, pady=(8,0))
@@ -100,11 +104,11 @@ class SegmentPage(ctk.CTkFrame):
 
         self._set_info("Load an example to begin.")
 
-        self._style_axes()
+        self._style_axes(self.ax_edge)
+        self._style_axes(self.ax_meter)
         self.canvas.draw()
 
-    def _style_axes(self):
-        ax = self.ax
+    def _style_axes(self, ax):
         ax.set_facecolor(BG_THIRDY)
         ax.tick_params(axis='both', colors='white', labelsize=8)
         ax.grid(True, linestyle='--', alpha=0.3, color='white')
@@ -190,25 +194,24 @@ class SegmentPage(ctk.CTkFrame):
 
     # Base drawing method
     def _draw_border(self):
-        ax = self.ax
-        ax.clear()
-        self._style_axes()
-        if not self.hull_mines:
-            self.canvas.draw()
-            return
+        for ax in (self.ax_edge, self.ax_meter):
+            ax.clear()
+            self._style_axes(ax)
+            if not self.hull_mines:
+                continue
+            self._draw_mines(ax)
+            n = len(self.hull_mines)
+            for i in range(n):
+                a = self.hull_mines[i]
+                b = self.hull_mines[(i + 1) % n]
+                ax.plot([a.pos[0], b.pos[0]], [a.pos[1], b.pos[1]],
+                        '-', color="#00FF7F", lw=1.8, alpha=0.55, zorder=2)
+            self._draw_hull_fill(ax)
+            self._draw_guards(ax, None)
+            self._draw_legend(ax, show_attack=False, show_winner=False)
 
-        self._draw_mines(ax)
-
-        n = len(self.hull_mines)
-        for i in range(n):
-            a = self.hull_mines[i]
-            b = self.hull_mines[(i + 1) % n]
-            ax.plot([a.pos[0], b.pos[0]], [a.pos[1], b.pos[1]],
-                    '-', color="#00FF7F", lw=1.8, alpha=0.55, zorder=2)
-
-        self._draw_hull_fill(ax)
-        self._draw_guards(ax, None)
-        self._draw_legend(ax, show_attack=False, show_winner=False)
+        self.ax_edge.set_title("Edge Attack", color="white", fontsize=9, pad=4)
+        self.ax_meter.set_title("Meter Attack", color="white", fontsize=9, pad=4)
         self.canvas.draw()
 
     # Drawing mines
@@ -266,9 +269,9 @@ class SegmentPage(ctk.CTkFrame):
 
     # Simulation of attack on the edge
     def _draw_border_edge_attack(self, highlight_edge_idx=None, winner=None):
-        ax = self.ax
+        ax = self.ax_edge
         ax.clear()
-        self._style_axes()
+        self._style_axes(ax)
         if not self.hull_mines:
             self.canvas.draw()
             return
@@ -289,13 +292,13 @@ class SegmentPage(ctk.CTkFrame):
         self._draw_hull_fill(ax)
         self._draw_guards(ax, winner)
         self._draw_legend(ax, show_attack=True, show_winner=winner is not None)
-        self.canvas.draw()
+        ax.set_title("Edge Attack", color="white", fontsize=9, pad=4)
 
     # Simulation of attack with meters
     def _draw_border_meter_attack(self, from_m, to_m, winner=None):
-        ax = self.ax
+        ax = self.ax_meter
         ax.clear()
-        self._style_axes()
+        self._style_axes(ax)
         if not self.hull_mines:
             self.canvas.draw()
             return
@@ -347,7 +350,7 @@ class SegmentPage(ctk.CTkFrame):
         self._draw_hull_fill(ax)
         self._draw_guards(ax, winner)
         self._draw_legend(ax, show_attack=True, show_winner=winner is not None)
-        self.canvas.draw()
+        ax.set_title("Meter Attack", color="white", fontsize=9, pad=4)
 
     def simulate_edge_attack(self):
         if not self.hull_mines or not self.guards or self.table is None:
@@ -371,7 +374,7 @@ class SegmentPage(ctk.CTkFrame):
 
         if winner:
             info = (
-                f"ATTACK ON EDGE {mine_from.id} → {mine_to.id}\n\n"
+                f"ATTACK ON EDGE \n{mine_from.id} → {mine_to.id}\n\n"
                 f"Commander chosen: {winner.name}\n"
                 f"Loudness: {winner.loudness}\n"
                 f"Position: {winner.position_meters:.1f} m\n"
@@ -381,7 +384,7 @@ class SegmentPage(ctk.CTkFrame):
             info = f"ATTACK ON EDGE {mine_from.id} → {mine_to.id}\n\nNo guards on this edge."
             log_msg = f"Attack on edge {mine_from.id} -> {mine_to.id}. Breach! No guards found on this edge."
             
-        self._set_info(info)
+        self._edge_info = info
 
         attack_event = {
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -423,7 +426,7 @@ class SegmentPage(ctk.CTkFrame):
             )
             log_msg = f"Attack range [{from_m:.1f}m -> {to_m:.1f}m]. Breach! Segment unprotected. Error: {error if error else 'Empty range'}."
 
-        self._set_info(info)
+        self._meter_info = info
 
         attack_event = {
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -432,6 +435,19 @@ class SegmentPage(ctk.CTkFrame):
             "log": log_msg
         }
         threading.Thread(target=self.background_save_task, args=[attack_event], daemon=True).start()
+
+    def _simulate_both(self):
+        self.simulate_edge_attack()
+        self.simulate_attack_by_meters()
+        self.canvas.draw()
+
+        self._set_info(
+            f"⚔  EDGE ATTACK\n"
+            f"{self._edge_info}\n"
+            f"\n\n"
+            f"🏹  METER ATTACK\n"
+            f"{self._meter_info}"
+        )
 
     def refresh_examples(self):
 
@@ -450,69 +466,63 @@ class SegmentPage(ctk.CTkFrame):
                 command=lambda p=json_path: self.load_example(p)
             ).pack(pady=5, padx=(5, 10), fill="x")
 
+   
     def background_save_task(self, attack_event=None):
         if not self.current_log_name:
             return
 
-        final_kra_name = self.current_log_name.replace(".", "_", 1) + ".kra"
-        final_kra_path = os.path.join("compressed_data", final_kra_name)
-        
-        decompressed_read_name = final_kra_name.replace(".kra", "").replace("_", ".", 1)
-        decompressed_dir = "decompressed_data"
-        decompressed_read_path = os.path.join(decompressed_dir, decompressed_read_name)
+        with _save_lock: 
+            final_kra_name  = self.current_log_name.replace(".", "_") + ".kra"
+            final_kra_path  = os.path.join("compressed_data", final_kra_name)
+            decompressed_dir = "decompressed_data"
+            write_path = os.path.join(decompressed_dir, self.current_log_name)
 
-        decompressed_write_path = os.path.join(decompressed_dir, self.current_log_name)
+            file_data = None
 
-        file_data = None
+            try:
+                if os.path.exists(final_kra_path):
+                    CompManager.decompress_one_file(final_kra_path)
+                    read_path = os.path.join(decompressed_dir, self.current_log_name)
+                    if os.path.exists(read_path):
+                        with open(read_path, 'r', encoding='utf-8') as f:
+                            file_data = json.load(f)
+                        os.remove(read_path)
+            except Exception as e:
+                print("Error reading old archive:", e)
 
-        try:
-            if os.path.exists(final_kra_path):
-                CompManager.decompress_one_file(final_kra_path)
-                
-                if os.path.exists(decompressed_read_path):
-                    with open(decompressed_read_path, 'r', encoding='utf-8') as f:
-                        file_data = json.load(f)
-                    
-                    os.remove(decompressed_read_path)
-        except Exception as e:
-            print("Error during reading old archive:", e)
-
-        if not file_data:
-            file_data = {
-                "inputs": {
-                    "dwarves": getattr(data_store, "dwarves", []),
-                    "mines": getattr(data_store, "mines", []),
-                    "guards": getattr(data_store, "guards", [])
-                },
-                "outputs": {
-                    "hull_mines": self.hull_mines,
-                    "placed_guards": self.guards,
-                    "step_meters": self.step_m,
-                    "attacks_history": []
+            if not file_data:
+                file_data = {
+                    "inputs": {
+                        "dwarves": getattr(data_store, "dwarves", []),
+                        "mines":   getattr(data_store, "mines",   []),
+                        "guards":  getattr(data_store, "guards",  [])
+                    },
+                    "outputs": {
+                        "hull_mines":      self.hull_mines,
+                        "placed_guards":   self.guards,
+                        "step_meters":     self.step_m,
+                        "attacks_history": []
+                    }
                 }
-            }
 
-        if "outputs" not in file_data: 
-            file_data["outputs"] = {}
-        if "attacks_history" not in file_data["outputs"]: 
-            file_data["outputs"]["attacks_history"] = []
+            file_data.setdefault("outputs", {}).setdefault("attacks_history", [])
 
-        if attack_event:
-            file_data["outputs"]["attacks_history"].append(attack_event)
+            if attack_event:
+                file_data["outputs"]["attacks_history"].append(attack_event)
 
-        try:
-            os.makedirs(decompressed_dir, exist_ok=True)
-            
-            with open(decompressed_write_path, 'w', encoding='utf-8') as f:
-                json.dump(file_data, f, ensure_ascii=False, indent=4, default=lambda o: o.__dict__)
-            
-            CompManager.compress_one_file(decompressed_write_path)
-            
-        except Exception as e:
-            import traceback
-            print(f"Segment BG append task ERROR: {e}")
-            traceback.print_exc()
-            
-        finally:
-            if os.path.exists(decompressed_write_path):
-                os.remove(decompressed_write_path)
+            try:
+                os.makedirs(decompressed_dir, exist_ok=True)
+                with open(write_path, 'w', encoding='utf-8') as f:
+                    json.dump(file_data, f, ensure_ascii=False, indent=4,
+                            default=lambda o: o.__dict__)
+
+                CompManager.compress_one_file(write_path) 
+
+            except Exception as e:
+                import traceback
+                print(f"Segment BG task ERROR: {e}")
+                traceback.print_exc()
+
+            finally:
+                if os.path.exists(write_path):
+                    os.remove(write_path)

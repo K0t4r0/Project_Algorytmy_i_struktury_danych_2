@@ -136,7 +136,7 @@ class FlowPage(ctk.CTkFrame):
                 current_val = self.slider.get()
                 
                 inverted_delay = (slider_max + slider_min) - current_val
-                delay = int(inverted_delay * 1000)
+                delay = int(inverted_delay * 500)
                 self.after(delay, self.run_animation_loop)
             else:
                 self.is_animating = False

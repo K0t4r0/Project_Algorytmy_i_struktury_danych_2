@@ -20,7 +20,11 @@ class MCMF:
         self.graph.append([v, u, 0, -cost, len(self.graph) - 1])
 
     def get_distance(self, pos1: Tuple[int, int], pos2: Tuple[int, int]):
-        return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
+        dx = pos1[0] - pos2[0]
+        dy = pos1[1] - pos2[1]
+        dist = dx*dx + dy*dy
+
+        return dist
 
     def build_network(self):
         #Calculating position for s, t (gui)

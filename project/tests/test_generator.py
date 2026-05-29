@@ -225,7 +225,15 @@ def test_generate_guards_values_are_inside_range(tmp_path):
     data = generator.generate()
 
     assert len(data["guards"]) == 5
-    assert all(10 <= guard <= 20 for guard in data["guards"])
+
+    for guard in data["guards"]:
+        assert "id" in guard
+        assert "name" in guard
+        assert "loudness" in guard
+
+        assert isinstance(guard["id"], int)
+        assert isinstance(guard["name"], str)
+        assert 10 <= guard["loudness"] <= 20
 
 
 def test_generate_uses_default_dwarf_name_when_names_are_missing(tmp_path):
@@ -272,9 +280,10 @@ def test_generate_and_save_creates_json_file(tmp_path):
         custom_config=custom_config
     )
 
-    data = generator.generate_and_save(output_file=str(output_file))
+    saved_path, data = generator.generate_and_save(output_file=str(output_file))
 
     assert output_file.exists()
+    assert saved_path == str(output_file)
 
     saved_data = json.loads(output_file.read_text())
 

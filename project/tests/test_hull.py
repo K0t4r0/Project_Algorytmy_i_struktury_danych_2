@@ -83,13 +83,11 @@ def test_generators_return_points_when_less_than_three():
     assert list(graham_generator(points)) == [(points, None)]
 
 
-def test_jarvis_function_returns_closed_hull_for_valid_input():
+def test_jarvis_function_returns_hull_for_valid_input():
     points = [(0, 0), (0, 2), (2, 0), (2, 2), (1, 1)]
 
-    steps = list(jarvis(points))
-    final_hull, current_point = steps[-1]
+    hull = jarvis(points)
 
-    assert current_point is None
-    assert final_hull[0] == final_hull[-1]
-    assert set(final_hull[:-1]) == {(0, 0), (0, 2), (2, 0), (2, 2)}
-    assert (1, 1) not in final_hull
+    assert set(hull) == {(0, 0), (0, 2), (2, 0), (2, 2)}
+    assert (1, 1) not in hull
+    assert len(hull) == 4

@@ -52,5 +52,5 @@ class App(ctk.CTk):
         elif name == "GeneratorPage":
             self.center_window(710, 590)
         else:
-            self.center_window(1200, 550)
+            self.center_window(1400, 650)
         self.update_idletasks()

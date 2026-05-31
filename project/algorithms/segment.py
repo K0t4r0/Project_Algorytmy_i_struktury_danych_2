@@ -28,14 +28,17 @@ def get_distance(pos1: Tuple[int, int], pos2: Tuple[int, int]):
 
 # Creates edge list for convex hull border
 
-def place_guards(hull_mines, guards):    
+def place_guards(hull_mines, guards):
     dist = 0.0
     edge_starts = []
+    edge_ranges = {}
+    edge_map = {}
 
     for i in range(len(hull_mines)):
         a = hull_mines[i]
         b = hull_mines[(i + 1) % len(hull_mines)]
 
+        edge_map[(a.id, b.id)] = i
         edge_starts.append(dist)
         dist += get_distance(a.pos, b.pos)
 
@@ -44,10 +47,16 @@ def place_guards(hull_mines, guards):
     for i, guard in enumerate(guards):
         pos = i * step
         edge_idx = bisect_right(edge_starts, pos) - 1
+
         guard.position_meters = pos
         guard.edge_index = edge_idx
 
-    return step
+        if edge_idx not in edge_ranges:
+            edge_ranges[edge_idx] = [i, i]
+        else:
+            edge_ranges[edge_idx][1] = i
+
+    return step, edge_ranges, edge_map
 
 def get_perimeter(hull_mines):    
     perimeter = 0.0
@@ -91,27 +100,56 @@ class SparseTable:
         right = self.st[k][r - 2 ** k + 1]
         idx = left if self.guards[left].loudness >= self.guards[right].loudness else right
         return self.guards[idx]
+    
+class SegmentTree:
+    def __init__(self, guards: list):
+        self.guards = guards
+        self.n = len(guards)
+        self.tree = [0] * (4 * self.n)
+        if self.n > 0:
+            self._build(0, 0, self.n - 1)
 
-def find_loudest_by_edge(guards, table, hull_mines, edge_from, edge_to):
-    edge_idx = None
-    for i in range(len(hull_mines)):
-        a = hull_mines[i]
-        b = hull_mines[(i + 1) % len(hull_mines)]
-        if a.id == edge_from.id and b.id == edge_to.id:
-            edge_idx = i
-            break
+    def _louder(self, a: int, b: int):
+        return a if self.guards[a].loudness >= self.guards[b].loudness else b
+
+    def _build(self, node: int, start: int, end: int):
+        if start == end:
+            self.tree[node] = start
+            return
+        mid = (start + end) // 2
+        self._build(2 * node + 1, start, mid)
+        self._build(2 * node + 2, mid + 1, end)
+        self.tree[node] = self._louder(self.tree[2 * node + 1],
+                                        self.tree[2 * node + 2])
+
+    def query(self, l: int, r: int):
+        if l > r:
+            return None
+        idx = self._query(0, 0, self.n - 1, l, r)
+        return self.guards[idx]
+
+    def _query(self, node: int, start: int, end: int, l: int, r: int) -> int:
+        if r < start or end < l:
+            return -1
+        if l <= start and end <= r:
+            return self.tree[node]
+        mid = (start + end) // 2
+        left_idx  = self._query(2 * node + 1, start, mid, l, r)
+        right_idx = self._query(2 * node + 2, mid + 1, end, l, r)
+        if left_idx  == -1: return right_idx
+        if right_idx == -1: return left_idx
+        return self._louder(left_idx, right_idx)
+    
+def find_loudest_by_edge(table, edge_ranges, edge_map, edge_from, edge_to):
+    edge_idx = edge_map.get((edge_from.id, edge_to.id))
 
     if edge_idx is None:
-        print(f"  Edge {edge_from.id}→{edge_to.id} not found on border")
         return None
 
-    indices = [k for k, g in enumerate(guards) if g.edge_index == edge_idx]
-    
-    if not indices:
+    if edge_idx not in edge_ranges:
         return None
 
-    l = indices[0]
-    r = indices[-1]
+    l, r = edge_ranges[edge_idx]
 
     return table.query(l, r)
 

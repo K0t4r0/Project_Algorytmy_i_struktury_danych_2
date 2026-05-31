@@ -8,7 +8,7 @@ from tools.draw import get_json_files
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from tools.data_manager import data_store
-from algorithms.segment import get_border_mines, place_guards, SparseTable, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
+from algorithms.segment import get_border_mines, place_guards, SparseTable, SegmentTree, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
 import os
 import threading
 from algorithms.hull import jarvis
@@ -16,6 +16,7 @@ import threading
 import tempfile
 import datetime
 import json
+import time
 from tools.compression_manager import CompManager
 
 _save_lock = threading.Lock() 
@@ -28,7 +29,11 @@ class SegmentPage(ctk.CTkFrame):
         self.hull_mines = []
         self.guards = []
         self.step_m = 1.0
+        self.edge_ranges = None
+        self.edge_map = None
         self.table = None
+        self.tree = None
+        self.queries = 100000
         self._edge_info  = ""
         self._meter_info = ""
         self.current_path = None
@@ -128,8 +133,9 @@ class SegmentPage(ctk.CTkFrame):
         data_store.load_from_json(path)
 
         self.hull_mines, self.guards = get_border_mines(path)
-        self.step_m = place_guards(self.hull_mines, self.guards)
-        self.table  = SparseTable(self.guards)
+        self.step_m, self.edge_ranges, self.edge_map = place_guards(self.hull_mines, self.guards)
+        self.table = SparseTable(self.guards)
+        self.tree = SegmentTree(self.guards)
 
         self.attack_btn.configure(state="normal")
         self._set_info(
@@ -363,21 +369,46 @@ class SegmentPage(ctk.CTkFrame):
 
         edge_idx = random.choice(edges_with_guards)
         mine_from = self.hull_mines[edge_idx]
-        mine_to   = self.hull_mines[(edge_idx + 1) % n]
+        mine_to = self.hull_mines[(edge_idx + 1) % n]
 
-        winner = find_loudest_by_edge(
-            self.guards, self.table,
-            self.hull_mines, mine_from, mine_to
-        )
+        start1_e = time.time()
+        for _ in range(self.queries):
+            winner = find_loudest_by_edge(
+                self.table, self.edge_ranges, self.edge_map, mine_from, mine_to
+            )
+        end1_e = time.time()
+        res1_e = end1_e - start1_e
+
+        start2_e = time.time()
+        for _ in range(self.queries):
+            winner2 = find_loudest_by_edge(
+                self.tree, self.edge_ranges, self.edge_map, mine_from, mine_to
+            )
+        end2_e = time.time()
+        res2_e = end2_e - start2_e
+
+        speedup = max(res1_e, res2_e) / min(res1_e, res2_e)
 
         self._draw_border_edge_attack(highlight_edge_idx=edge_idx, winner=winner)
+
+        if res1_e < res2_e:
+            comparison = f"Sparse Table was {speedup:.2f}x faster than Segment Tree."
+        elif res2_e < res1_e:
+            comparison = f"Segment Tree was {speedup:.2f}x faster than Sparse Table."
+        else:
+            comparison = "Both structures achieved the same execution time."
 
         if winner:
             info = (
                 f"ATTACK ON EDGE \n{mine_from.id} → {mine_to.id}\n\n"
                 f"Commander chosen: {winner.name}\n"
                 f"Loudness: {winner.loudness}\n"
-                f"Position: {winner.position_meters:.1f} m\n"
+                f"Position: {winner.position_meters:.1f} m\n\n"
+                f"{winner.name}: Archers! Draw! Fire!\n\n"
+                f"Time for {self.queries} queries\n"
+                f"Sparse Table: {res1_e:.6f} s\n"
+                f"Segment Tree: {res2_e:.6f} s\n\n"
+                f"{comparison}"
             )
             log_msg = f"Attack on edge {mine_from.id} -> {mine_to.id}. Defended by Commander {winner.name} (Loudness: {winner.loudness})."
         else:
@@ -403,11 +434,32 @@ class SegmentPage(ctk.CTkFrame):
         from_m = random.uniform(0, perimeter)
         to_m = (from_m + random.uniform(5, perimeter * 0.3)) % perimeter
 
-        winner, error = find_loudest_by_meters(
-            self.guards, self.table, self.step_m, from_m, to_m
-        )
+        start1_m = time.time()
+        for _ in range(self.queries):
+            winner, error = find_loudest_by_meters(
+                self.guards, self.table, self.step_m, from_m, to_m
+            )
+        end1_m = time.time()
+        res1_m = end1_m - start1_m
+
+        start2_m = time.time()
+        for _ in range(self.queries):
+            winner2, error = find_loudest_by_meters(
+                self.guards, self.tree, self.step_m, from_m, to_m
+            )
+        end2_m = time.time()
+        res2_m = end2_m - start2_m
+
+        speedup = max(res1_m, res2_m) / min(res1_m, res2_m)
 
         self._draw_border_meter_attack(from_m, to_m, winner=winner)
+
+        if res1_m < res2_m:
+            comparison = f"Sparse Table was {speedup:.2f}x faster than Segment Tree."
+        elif res2_m < res1_m:
+            comparison = f"Segment Tree was {speedup:.2f}x faster than Sparse Table."
+        else:
+            comparison = "Both structures achieved the same execution time."
 
         if winner:
             info = (
@@ -415,7 +467,11 @@ class SegmentPage(ctk.CTkFrame):
                 f"Commander chosen: {winner.name}\n"
                 f"Loudness: {winner.loudness}\n"
                 f"Position: {winner.position_meters:.1f} m\n\n"
-                f"{winner.name}: Archers! Draw! Fire!"
+                f"{winner.name}: Archers! Draw! Fire!\n\n"
+                f"Time for {self.queries} queries\n"
+                f"Sparse Table: {res1_m:.6f} s\n"
+                f"Segment Tree: {res2_m:.6f} s\n\n"
+                f"{comparison}"
             )
             log_msg = f"Attack range [{from_m:.1f}m -> {to_m:.1f}m]. Defended by Commander {winner.name} (Loudness: {winner.loudness})."
         else:
@@ -442,10 +498,10 @@ class SegmentPage(ctk.CTkFrame):
         self.canvas.draw()
 
         self._set_info(
-            f"⚔  EDGE ATTACK\n"
+            f"EDGE ATTACK\n"
             f"{self._edge_info}\n"
             f"\n\n"
-            f"🏹  METER ATTACK\n"
+            f"METER ATTACK\n"
             f"{self._meter_info}"
         )
 

@@ -1,11 +1,10 @@
 import os
-import time
 import json
 import datetime
 import customtkinter as ctk
 
 from tools.compression_manager import CompManager 
-from algorithms.search import kmp_file_search
+from algorithms.search import rabin_karp_file_search
 from ui.colors import *
 
 class CompressionPage(ctk.CTkFrame):
@@ -144,7 +143,18 @@ class CompressionPage(ctk.CTkFrame):
 
             self.textbox.delete("1.0", "end")
             self.textbox.insert("1.0", content)
-            self.info_label.configure(text=f"Loaded:\n{out_name}\n\nSize: {len(content)} chars")
+
+            comp_size = os.stat(kra_path).st_size
+            decomp_size = os.stat(os.path.join("decompressed_data", out_name)).st_size
+            info_label_text = f"Loaded:\n{out_name}\n\nSize: {len(content)} chars\n\n"
+
+            info_label_text += f"Original size = {(decomp_size / 1024):.4f} KB\n"
+            info_label_text += f"Compressed size = {(comp_size / 1024):.4f} KB\n\n"
+
+            if decomp_size > comp_size:
+                info_label_text += f"Compressed file is {(decomp_size / comp_size):.2f}x smaller than original one\n"
+
+            self.info_label.configure(text=info_label_text)
             
             self.clear_search()
 
@@ -160,7 +170,7 @@ class CompressionPage(ctk.CTkFrame):
         self.info_label.configure(text=f"Searching for '{pattern}'...")
         self.update()
 
-        self.current_results = kmp_file_search(self.current_decompressed_path, pattern)
+        self.current_results = rabin_karp_file_search(self.current_decompressed_path, pattern)
         self.pattern_length = len(pattern)
         
         self.textbox.tag_remove("highlight", "1.0", "end")

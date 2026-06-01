@@ -6,14 +6,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
 from tools.draw import get_json_files
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 from tools.data_manager import data_store
 from algorithms.segment import get_border_mines, place_guards, SparseTable, SegmentTree, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
 import os
 import threading
 from algorithms.hull import jarvis
 import threading
-import tempfile
 import datetime
 import json
 import time
@@ -38,6 +36,8 @@ class SegmentPage(ctk.CTkFrame):
         self._meter_info = ""
         self.current_path = None
         self.current_log_name = None
+
+        self._log_data = None
 
         # Left frame (examples)
         left_frame = ctk.CTkFrame(self, width=200, fg_color=BG_SECONDARY, corner_radius=0)
@@ -156,12 +156,34 @@ class SegmentPage(ctk.CTkFrame):
             "outputs": {
                 "hull_mines": self.hull_mines,
                 "placed_guards": self.guards,
-                "step_meters": self.step_m
+                "step_meters": self.step_m,
+                "attacks_history": []
             }
         }
         hash_str = json.dumps(initial_data, ensure_ascii=False, sort_keys=True, default=lambda o: o.__dict__)
         data_hash = hashlib.sha256(hash_str.encode('utf-8')).hexdigest()[:16]
         self.current_log_name = f"segment_result_{data_hash}.json"
+
+        self._log_data = None
+        final_kra_name  = self.current_log_name.replace(".", "_") + ".kra"
+        final_kra_path  = os.path.join("compressed_data", final_kra_name)
+        decompressed_dir = "decompressed_data"
+
+        try:
+            if os.path.exists(final_kra_path):
+                CompManager.decompress_one_file(final_kra_path)
+                read_path = os.path.join(decompressed_dir, self.current_log_name)
+                if os.path.exists(read_path):
+                    with open(read_path, 'r', encoding='utf-8') as f:
+                        self._log_data = json.load(f)
+                    os.remove(read_path)
+        except Exception as e:
+            print("Error reading old archive:", e)
+
+        if not self._log_data:
+            self._log_data = initial_data
+        else:
+            self._log_data.setdefault("outputs", {}).setdefault("attacks_history", [])
 
         if self.guards and self.hull_mines:
             threading.Thread(target=self.background_save_task, args=[None], daemon=True).start()
@@ -524,53 +546,27 @@ class SegmentPage(ctk.CTkFrame):
 
    
     def background_save_task(self, attack_event=None):
-        if not self.current_log_name:
+        if not self.current_log_name or self._log_data is None:
             return
 
         with _save_lock: 
-            final_kra_name  = self.current_log_name.replace(".", "_") + ".kra"
-            final_kra_path  = os.path.join("compressed_data", final_kra_name)
+            if "outputs" not in self._log_data or not isinstance(self._log_data["outputs"], dict):
+                self._log_data["outputs"] = {}
+                
+            self._log_data["outputs"].setdefault("attacks_history", [])
+
+            if attack_event:
+                self._log_data["outputs"]["attacks_history"].append(attack_event)
+
             decompressed_dir = "decompressed_data"
             write_path = os.path.join(decompressed_dir, self.current_log_name)
 
-            file_data = None
-
-            try:
-                if os.path.exists(final_kra_path):
-                    CompManager.decompress_one_file(final_kra_path)
-                    read_path = os.path.join(decompressed_dir, self.current_log_name)
-                    if os.path.exists(read_path):
-                        with open(read_path, 'r', encoding='utf-8') as f:
-                            file_data = json.load(f)
-                        os.remove(read_path)
-            except Exception as e:
-                print("Error reading old archive:", e)
-
-            if not file_data:
-                file_data = {
-                    "inputs": {
-                        "dwarves": getattr(data_store, "dwarves", []),
-                        "mines":   getattr(data_store, "mines",   []),
-                        "guards":  getattr(data_store, "guards",  [])
-                    },
-                    "outputs": {
-                        "hull_mines":      self.hull_mines,
-                        "placed_guards":   self.guards,
-                        "step_meters":     self.step_m,
-                        "attacks_history": []
-                    }
-                }
-
-            file_data.setdefault("outputs", {}).setdefault("attacks_history", [])
-
-            if attack_event:
-                file_data["outputs"]["attacks_history"].append(attack_event)
-
             try:
                 os.makedirs(decompressed_dir, exist_ok=True)
+                
                 with open(write_path, 'w', encoding='utf-8') as f:
-                    json.dump(file_data, f, ensure_ascii=False, indent=4,
-                            default=lambda o: o.__dict__)
+                    json.dump(self._log_data, f, ensure_ascii=False, indent=4,
+                              default=lambda o: o.__dict__)
 
                 CompManager.compress_one_file(write_path) 
 

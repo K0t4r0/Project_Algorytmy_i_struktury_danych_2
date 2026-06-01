@@ -18,7 +18,7 @@ class DataManager:
             with open(file_path, "r", encoding="utf-8") as file:
                 data = json.load(file)
 
-            self.dwarves = [Dwarf(d["id"], d["name"], d["skills"], d["value"], tuple(d["home_pos"])) for d in data["dwarves"]]
+            self.dwarves = [Dwarf(d["id"], d["name"], d["skills"], tuple(d["home_pos"])) for d in data["dwarves"]]
             self.mines = [Mine(m["id"], m["mine_type"], m["capacity"], tuple(m["pos"])) for m in data["mines"]]
             self.guards = [BorderGuard(g["id"], g["name"], g["loudness"]) for g in data.get("guards", [])]
 

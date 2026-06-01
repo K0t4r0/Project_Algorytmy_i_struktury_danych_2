@@ -100,10 +100,3 @@ class CompManager:
             for _ in results:
                 pass
             
-
-if __name__ == "__main__":
-    # paths = ["json/test1.json", "json/test2.json", "json/test3.json"]
-    # CompManager.compress_files(paths)
-    CompManager.decompress_one_file("compressed_data/test1_json.kra")
-
-        

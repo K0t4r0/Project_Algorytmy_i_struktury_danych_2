@@ -1,4 +1,3 @@
-import datetime
 import tempfile
 import json
 import threading
@@ -9,7 +8,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
 from tools.draw import select_example, draw_flow, draw_world, get_json_files
 from algorithms.min_cost_max_flow import MCMF
-from tools.data_manager import data_store, DataManager
+from tools.data_manager import data_store
 import os
 import copy
 import hashlib

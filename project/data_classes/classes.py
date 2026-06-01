@@ -6,7 +6,6 @@ class Dwarf:
     id: int
     name: str
     skills: List[str]
-    value: int
     home_pos: Tuple[int, int]
 
 @dataclass

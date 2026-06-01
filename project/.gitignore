@@ -1,2 +1,5 @@
 __pycache__
 venv
+compressed_data
+decompressed_data
+json

@@ -31,6 +31,8 @@ class SegmentPage(ctk.CTkFrame):
         self.edge_map = None
         self.table = None
         self.tree = None
+        self.table_buildTime = 0
+        self.tree_buildTime = 0
         self.queries = 100000
         self._edge_info  = ""
         self._meter_info = ""
@@ -134,8 +136,16 @@ class SegmentPage(ctk.CTkFrame):
 
         self.hull_mines, self.guards = get_border_mines(path)
         self.step_m, self.edge_ranges, self.edge_map = place_guards(self.hull_mines, self.guards)
+
+        start = time.time()
         self.table = SparseTable(self.guards)
+        end = time.time()
+        self.table_buildTime = end - start
+
+        start = time.time()
         self.tree = SegmentTree(self.guards)
+        end = time.time()
+        self.tree_buildTime = end - start
 
         self.attack_btn.configure(state="normal")
         self._set_info(
@@ -399,7 +409,7 @@ class SegmentPage(ctk.CTkFrame):
                 self.table, self.edge_ranges, self.edge_map, mine_from, mine_to
             )
         end1_e = time.time()
-        res1_e = end1_e - start1_e
+        res1_e = end1_e - start1_e + self.table_buildTime
 
         start2_e = time.time()
         for _ in range(self.queries):
@@ -407,7 +417,7 @@ class SegmentPage(ctk.CTkFrame):
                 self.tree, self.edge_ranges, self.edge_map, mine_from, mine_to
             )
         end2_e = time.time()
-        res2_e = end2_e - start2_e
+        res2_e = end2_e - start2_e + self.tree_buildTime
 
         speedup = max(res1_e, res2_e) / min(res1_e, res2_e)
 
@@ -427,6 +437,8 @@ class SegmentPage(ctk.CTkFrame):
                 f"Loudness: {winner.loudness}\n"
                 f"Position: {winner.position_meters:.1f} m\n\n"
                 f"{winner.name}: Archers! Draw! Fire!\n\n"
+                #f"Table build time: {self.table_buildTime:.6f} s\n"
+                #f"Tree build time: {self.tree_buildTime:.6f} s\n"
                 f"Time for {self.queries} queries\n"
                 f"Sparse Table: {res1_e:.6f} s\n"
                 f"Segment Tree: {res2_e:.6f} s\n\n"
@@ -462,7 +474,7 @@ class SegmentPage(ctk.CTkFrame):
                 self.guards, self.table, self.step_m, from_m, to_m
             )
         end1_m = time.time()
-        res1_m = end1_m - start1_m
+        res1_m = end1_m - start1_m + self.table_buildTime
 
         start2_m = time.time()
         for _ in range(self.queries):
@@ -470,7 +482,7 @@ class SegmentPage(ctk.CTkFrame):
                 self.guards, self.tree, self.step_m, from_m, to_m
             )
         end2_m = time.time()
-        res2_m = end2_m - start2_m
+        res2_m = end2_m - start2_m + self.tree_buildTime
 
         speedup = max(res1_m, res2_m) / min(res1_m, res2_m)
 

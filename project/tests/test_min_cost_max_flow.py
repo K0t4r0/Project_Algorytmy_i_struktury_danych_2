@@ -15,7 +15,7 @@ def test_mcmf_creation():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(3, 4))
@@ -69,7 +69,7 @@ def test_build_network_adds_source_to_dwarf_edge():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(10, 0))
@@ -85,7 +85,7 @@ def test_build_network_adds_dwarf_to_mine_edge_when_skill_matches():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(3, 4))
@@ -111,7 +111,7 @@ def test_build_network_does_not_add_dwarf_to_mine_edge_when_skill_does_not_match
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="iron", capacity=1, pos=(3, 4))
@@ -135,7 +135,7 @@ def test_build_network_adds_mine_to_sink_edge_with_capacity():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=3, pos=(10, 0))
@@ -161,7 +161,7 @@ def test_build_network_sets_source_and_sink_positions_in_data_store():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(10, 10))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(10, 10))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(30, 20))
@@ -178,7 +178,7 @@ def test_get_current_paths_returns_empty_list_before_solving():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(10, 0))
@@ -196,7 +196,7 @@ def test_solve_generator_finds_one_assignment():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(10, 0))
@@ -227,7 +227,7 @@ def test_solve_generator_does_not_assign_dwarf_without_matching_skill():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="iron", capacity=1, pos=(10, 0))
@@ -246,8 +246,8 @@ def test_solve_generator_respects_mine_capacity():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0)),
-        Dwarf(id=2, name="Balin", skills=["gold"], value=90, home_pos=(0, 10)),
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0)),
+        Dwarf(id=2, name="Balin", skills=["gold"], home_pos=(0, 10)),
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(10, 0))
@@ -274,8 +274,8 @@ def test_solve_generator_can_assign_two_dwarves_when_capacity_allows():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0)),
-        Dwarf(id=2, name="Balin", skills=["gold"], value=90, home_pos=(0, 10)),
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0)),
+        Dwarf(id=2, name="Balin", skills=["gold"], home_pos=(0, 10)),
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=2, pos=(10, 0))
@@ -307,7 +307,7 @@ def test_solve_generator_without_gui_does_not_update_data_store_flow_paths():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(10, 0))
@@ -327,7 +327,7 @@ def test_solve_generator_step_data_has_expected_keys():
     data_store = FakeDataStore()
 
     dwarves = [
-        Dwarf(id=1, name="Gimli", skills=["gold"], value=100, home_pos=(0, 0))
+        Dwarf(id=1, name="Gimli", skills=["gold"], home_pos=(0, 0))
     ]
     mines = [
         Mine(id="M-01", mine_type="gold", capacity=1, pos=(10, 0))

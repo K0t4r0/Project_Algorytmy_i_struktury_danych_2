@@ -10,7 +10,6 @@ def test_dwarf_creation():
         id=1,
         name="Doc",
         skills=["gold"],
-        value=100,
         home_pos=(10, 20)
     )
 

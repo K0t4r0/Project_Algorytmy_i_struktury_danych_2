@@ -1,24 +1,4 @@
-from algorithms.shortest_path import bellman_ford, dijkstra
-
-
-def test_dijkstra_returns_shortest_distance():
-    graph = {
-        1: {2: 2, 3: 10},
-        2: {3: 3},
-        3: {},
-    }
-
-    assert dijkstra(graph, 1, 3, 3) == 5
-
-
-def test_dijkstra_returns_none_when_path_does_not_exist():
-    graph = {
-        1: {2: 1},
-        2: {},
-        3: {},
-    }
-
-    assert dijkstra(graph, 1, 3, 3) is None
+from algorithms.shortest_path import bellman_ford
 
 
 def test_bellman_ford_returns_distance_parent_and_edge_info():

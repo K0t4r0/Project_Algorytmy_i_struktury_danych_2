@@ -1,5 +1,3 @@
-import math
-
 from algorithms.segment import (
     SparseTable,
     find_loudest_by_edge,
@@ -36,11 +34,25 @@ def test_place_guards_sets_positions_and_edges():
         BorderGuard(4, "G4", 40),
     ]
 
-    step = place_guards(make_square_mines(), guards)
+    step, edge_ranges, edge_map = place_guards(make_square_mines(), guards)
 
     assert step == 10
     assert [guard.position_meters for guard in guards] == [0, 10, 20, 30]
     assert [guard.edge_index for guard in guards] == [0, 1, 2, 3]
+
+    assert edge_ranges == {
+        0: [0, 0],
+        1: [1, 1],
+        2: [2, 2],
+        3: [3, 3],
+    }
+
+    assert edge_map == {
+        ("A", "B"): 0,
+        ("B", "C"): 1,
+        ("C", "D"): 2,
+        ("D", "A"): 3,
+    }
 
 
 def test_sparse_table_query_returns_loudest_guard_in_range():
@@ -71,12 +83,43 @@ def test_find_loudest_by_edge_returns_guard_on_selected_edge():
         BorderGuard(3, "G3", 30),
         BorderGuard(4, "G4", 40),
     ]
-    place_guards(mines, guards)
+
+    _, edge_ranges, edge_map = place_guards(mines, guards)
     table = SparseTable(guards)
 
-    result = find_loudest_by_edge(guards, table, mines, mines[1], mines[2])
+    result = find_loudest_by_edge(
+        table,
+        edge_ranges,
+        edge_map,
+        mines[1],
+        mines[2],
+    )
 
     assert result.id == 2
+    assert result.loudness == 80
+
+
+def test_find_loudest_by_edge_returns_none_for_unknown_edge():
+    mines = make_square_mines()
+    guards = [
+        BorderGuard(1, "G1", 10),
+        BorderGuard(2, "G2", 80),
+        BorderGuard(3, "G3", 30),
+        BorderGuard(4, "G4", 40),
+    ]
+
+    _, edge_ranges, edge_map = place_guards(mines, guards)
+    table = SparseTable(guards)
+
+    result = find_loudest_by_edge(
+        table,
+        edge_ranges,
+        edge_map,
+        mines[0],
+        mines[2],
+    )
+
+    assert result is None
 
 
 def test_find_loudest_by_meters_supports_wrapped_range():
@@ -86,14 +129,31 @@ def test_find_loudest_by_meters_supports_wrapped_range():
         BorderGuard(3, "G3", 30),
         BorderGuard(4, "G4", 90),
     ]
-    for index, guard in enumerate(guards):
-        guard.position_meters = index * 10
+
     table = SparseTable(guards)
 
     result, error = find_loudest_by_meters(guards, table, 10, 25, 5)
 
     assert error is None
     assert result.id == 4
+    assert result.loudness == 90
+
+
+def test_find_loudest_by_meters_returns_loudest_guard_in_normal_range():
+    guards = [
+        BorderGuard(1, "G1", 10),
+        BorderGuard(2, "G2", 80),
+        BorderGuard(3, "G3", 30),
+        BorderGuard(4, "G4", 40),
+    ]
+
+    table = SparseTable(guards)
+
+    result, error = find_loudest_by_meters(guards, table, 10, 0, 20)
+
+    assert error is None
+    assert result.id == 2
+    assert result.loudness == 80
 
 
 def test_find_loudest_by_meters_returns_message_when_no_guards():

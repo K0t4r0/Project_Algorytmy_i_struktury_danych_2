@@ -78,7 +78,7 @@ class MCMF:
 
         return paths
 
-    def solve_generator(self, is_use_gui=True):
+    def solve_generator(self, is_use_gui=True, animated=True):
         step_count = 1
         total_cost = 0.0
 
@@ -132,6 +132,17 @@ class MCMF:
                 "total_cost_so_far": round(total_cost, 2),
                 "paths": current_step_paths
             }
-            
-            yield step_data
+
+            if animated:
+                yield step_data
+
             step_count += 1
+            
+            if not animated:
+                yield {
+                    "step": step_count - 1,
+                    "action": "Completed.",
+                    "step_cost": 0,
+                    "total_cost_so_far": round(total_cost, 2),
+                    "paths": self.get_current_paths()
+                }

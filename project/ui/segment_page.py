@@ -4,7 +4,7 @@ import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import get_json_files
+from tools.data_manager import get_json_files
 from matplotlib.lines import Line2D
 from tools.data_manager import data_store
 from algorithms.segment import get_border_mines, place_guards, SparseTable, SegmentTree, find_loudest_by_edge, find_loudest_by_meters, get_perimeter
@@ -16,6 +16,7 @@ import datetime
 import json
 import time
 from tools.compression_manager import CompManager
+from tools.graph_navigation import connect_navigation
 
 _save_lock = threading.Lock() 
 
@@ -38,8 +39,9 @@ class SegmentPage(ctk.CTkFrame):
         self._meter_info = ""
         self.current_path = None
         self.current_log_name = None
-
         self._log_data = None
+        self.graph_state_edge  = {"drag_start": None}
+        self.graph_state_meter = {"drag_start": None}
 
         # Left frame (examples)
         left_frame = ctk.CTkFrame(self, width=200, fg_color=BG_SECONDARY, corner_radius=0)
@@ -74,7 +76,10 @@ class SegmentPage(ctk.CTkFrame):
 
         self.canvas = FigureCanvasTkAgg(self.fig, graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
-
+        connect_navigation(self.canvas, {
+            self.ax_edge:  self.graph_state_edge,
+            self.ax_meter: self.graph_state_meter,
+        })
         # Attack button below the graph
         controls_frame = ctk.CTkFrame(mid_frame, height=60, fg_color="transparent")
         controls_frame.propagate(False)

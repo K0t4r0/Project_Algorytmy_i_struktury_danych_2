@@ -2,12 +2,12 @@ import customtkinter as ctk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import draw_sub_hull, get_json_files
-from tools.data_manager import data_store
+from tools.draw import draw_sub_hull
+from tools.data_manager import data_store, get_json_files
 from algorithms.hull import graham_generator, jarvis_generator, jarvis, graham_scan
 import os
 import time
-
+from tools.graph_navigation import connect_navigation
 import threading
 import tempfile
 import hashlib
@@ -25,6 +25,9 @@ class HullPage(ctk.CTkFrame):
         self.hull_gen = None
         self.selected_alg = "graham"
         self.res1, self.res2 = 0, 0
+        self.animated = True
+        self.graph_state_graham = {"drag_start": None}
+        self.graph_state_jarvis = {"drag_start": None}
 
         left_frame = ctk.CTkFrame(self, 
                      width=200,
@@ -41,6 +44,17 @@ class HullPage(ctk.CTkFrame):
 
         #Examples
         self.refresh_examples()
+
+        #Toggle button for off/on animation
+        self.anim_mode_btn = ctk.CTkButton(
+            left_frame,
+            text="Animation: ON",
+            font=("Arial", 15),
+            width=140,
+            command=self.toggle_anim_mode
+        )
+        self.anim_mode_btn.pack(pady=(0, 5), padx=8)
+        self.default_fg = self.anim_mode_btn.cget("fg_color")
 
         #Return button to Main menu
         ctk.CTkButton(left_frame,
@@ -117,8 +131,27 @@ class HullPage(ctk.CTkFrame):
         self.canvas = FigureCanvasTkAgg(self.fig, graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
 
+        connect_navigation(self.canvas, {
+            self.ax_graham: self.graph_state_graham,
+            self.ax_jarvis: self.graph_state_jarvis,
+        })
+
         self.apply_step()
 
+    #Function for toggle button (off/on)
+    def toggle_anim_mode(self):
+        self.animated = not self.animated
+        
+        self.anim_mode_btn.configure(
+            text=f"Animation: {'ON' if self.animated else 'OFF'}",
+            fg_color=self.default_fg if self.animated else "#555555"
+        )
+        state = "normal" if self.animated else "disabled"
+        self.toggle_btn.configure(
+            text="Start Animation" if self.animated else "Start"
+        )
+        self.back_btn.configure(state=state)
+        self.next_btn.configure(state=state)
 
     # Functions for animation
     def load_new_example(self, path):
@@ -195,11 +228,30 @@ class HullPage(ctk.CTkFrame):
 
         if self.graham_gen is None or self.jarvis_gen is None:
             points = [m.pos for m in data_store.mines]
-            if not points: return False
+            if not points:
+                return False
             self.graham_gen = graham_generator(points)
             self.jarvis_gen = jarvis_generator(points)
 
             threading.Thread(target=self.background_save_task, daemon=True).start()
+
+            if not self.animated:
+                final_g, final_j = ([], None), ([], None)
+                while True:
+                    prev_g, prev_j = final_g, final_j
+                    step_g = next(self.graham_gen, prev_g)
+                    step_j = next(self.jarvis_gen, prev_j)
+                    if step_g == prev_g and step_j == prev_j:
+                        break
+                    final_g, final_j = step_g, step_j
+
+                self.history.append((final_g, final_j))
+                self.current_idx += 1
+                self.apply_step()
+                self.graham_gen = None
+                self.jarvis_gen = None
+                self.toggle_btn.configure(text="Reset")
+                return False
 
         try:
             prev_g, prev_j = self.history[-1]

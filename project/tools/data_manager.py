@@ -1,5 +1,16 @@
 import json
 from data_classes.classes import Dwarf, Mine, BorderGuard
+import re
+from pathlib import Path
+
+# Get all json files in project
+def get_json_files():
+    examples_path = Path("json/")
+
+    return sorted(
+        examples_path.glob("*.json"),
+        key=lambda p: int(re.search(r"\d+", p.stem).group())
+    )
 
 class DataManager:
     def __init__(self):
@@ -12,6 +23,7 @@ class DataManager:
         self.s_pos = []
         self.t_pos = []
         self.mode = None
+        self.show_st = True
 
     def load_from_json(self, file_path : str) -> bool:
         try:
@@ -29,7 +41,7 @@ class DataManager:
         except Exception as e:
             print("Loading error:", e)
             return False
-        
+
     def clear(self):
         self.dwarves = []
         self.mines = []

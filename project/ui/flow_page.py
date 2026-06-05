@@ -6,12 +6,13 @@ from tools.compression_manager import CompManager
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ui.colors import *
-from tools.draw import select_example, draw_flow, draw_world, get_json_files
+from tools.draw import select_example, draw_flow, draw_world
 from algorithms.min_cost_max_flow import MCMF
-from tools.data_manager import data_store
+from tools.data_manager import data_store, get_json_files
 import os
 import copy
 import hashlib
+from tools.graph_navigation import connect_navigation
 
 
 class FlowPage(ctk.CTkFrame):
@@ -24,6 +25,11 @@ class FlowPage(ctk.CTkFrame):
         self.is_animating = False
         self.solver_gen = None
         self.json_path = None
+        self.animated = True
+        self.st_visible = True
+        self.graph_state = {
+            "drag_start": None
+        }
 
         left_frame = ctk.CTkFrame(self, 
                      width=200,
@@ -40,6 +46,26 @@ class FlowPage(ctk.CTkFrame):
 
         #Examples
         self.refresh_examples()
+
+        #Toggle button for off/on animation
+        self.anim_mode_btn = ctk.CTkButton(
+            left_frame,
+            text="Animation: ON",
+            font=("Arial", 15),
+            width=140,
+            command=self._toggle_anim_mode
+        )
+        self.anim_mode_btn.pack(side="top", padx=8, pady=(0, 8))
+        self.default_fg = self.anim_mode_btn.cget("fg_color")
+
+        self.st_toggle_btn = ctk.CTkButton(
+            left_frame,
+            text="S/T nodes: ON",
+            font=("Arial", 15),
+            width=140,
+            command=self._toggle_st
+        )
+        self.st_toggle_btn.pack(side="top", padx=8, pady=(0, 8))
 
         #Return button to Main menu
         ctk.CTkButton(left_frame,
@@ -91,9 +117,13 @@ class FlowPage(ctk.CTkFrame):
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor(BG_THIRDY)
         self.fig.subplots_adjust(left=0.08, right=0.95, top=0.95, bottom=0.08)
-        
+       
         self.canvas = FigureCanvasTkAgg(self.fig, graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
+        
+        connect_navigation(self.canvas, {
+            self.ax: self.graph_state,
+        })
 
         self.ax.tick_params(axis='both', colors='white')
 
@@ -105,7 +135,31 @@ class FlowPage(ctk.CTkFrame):
 
         self.ax.yaxis.grid(True, linestyle='--', alpha=0.3, color='white')
         self.ax.xaxis.grid(True, linestyle='--', alpha=0.3, color='white')
-        
+    
+    #Function for toggle button (off/on)
+    def _toggle_anim_mode(self):
+        self.animated = not self.animated
+        self.anim_mode_btn.configure(
+            text=f"Animation: {'ON' if self.animated else 'OFF'}",
+            fg_color=self.default_fg if self.animated else "#555555"
+        )
+
+        state = "normal" if self.animated else "disabled"
+        self.toggle_btn.configure(
+            text="Start Animation" if self.animated else "Start"
+        )
+        self.back_btn.configure(state=state)
+        self.next_btn.configure(state=state)
+
+    def _toggle_st(self):
+        self.st_visible = not self.st_visible
+        data_store.show_st = self.st_visible
+        self.st_toggle_btn.configure(
+            text=f"S/T nodes: {'ON' if self.st_visible else 'OFF'}",
+            fg_color=self.default_fg if self.st_visible else "#555555"
+        )
+        draw_flow(self.canvas)
+
     #Functions for animation
     def toggle_animation_button(self):
         if self.toggle_btn.cget("text") == "Reset":
@@ -127,6 +181,7 @@ class FlowPage(ctk.CTkFrame):
         self.is_animating = False
         self.toggle_btn.configure(text="Start Animation")
 
+
     def run_animation_loop(self):
         if self.is_animating:
             if self.step_forward():
@@ -146,19 +201,30 @@ class FlowPage(ctk.CTkFrame):
             self.current_idx += 1
             self.apply_step()
             return True
-        
+
         if self.solver_gen is None:
             self.solver = MCMF(data_store.dwarves, data_store.mines, data_store)
             self.solver.build_network()
-            self.solver_gen = self.solver.solve_generator()
+            self.solver_gen = self.solver.solve_generator(animated=self.animated)
 
             data_store_copy = copy.deepcopy(data_store)
-
             threading.Thread(
                 target=self.background_save_task,
                 args=[data_store_copy],
                 daemon=True
             ).start()
+
+            if not self.animated:
+                result = None
+                for result in self.solver_gen:
+                    pass
+                if result:
+                    self.history.append(result)
+                    self.current_idx += 1
+                    self.apply_step()
+                self.solver_gen = None
+                self.toggle_btn.configure(text="Reset")
+                return False
 
         try:
             new_paths = next(self.solver_gen)

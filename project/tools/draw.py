@@ -1,16 +1,6 @@
 from ui.colors import *
-from pathlib import Path
 from tools.data_manager import data_store
-import re
 
-# Get all json files in project
-def get_json_files():
-    examples_path = Path("json/")
-
-    return sorted(
-        examples_path.glob("*.json"),
-        key=lambda p: int(re.search(r"\d+", p.stem).group())
-    )
 
 # Loading json file
 def select_example(json_path, canvas):
@@ -63,28 +53,34 @@ def draw_flow(canvas):
     ax = canvas.figure.axes[0]
     draw_world(canvas)
 
-    if data_store.s_pos:
-        ax.plot(*data_store.s_pos, '^', color='green', ms=15, label="Source (S)")
-    if data_store.t_pos:
-        ax.plot(*data_store.t_pos, 'v', color='red', ms=15, label="Sink (T)")
+    if data_store.show_st:
+        if data_store.s_pos:
+            ax.plot(*data_store.s_pos, '^', color='green', ms=15, label="Source (S)")
+        if data_store.t_pos:
+            ax.plot(*data_store.t_pos, 'v', color='red', ms=15, label="Sink (T)")
 
-    ax.legend(loc='upper left', 
-              bbox_to_anchor=(1, 1), 
-              frameon=False, 
+    ax.legend(loc='upper left',
+              bbox_to_anchor=(1, 1),
+              frameon=False,
               labelcolor='white',
               labelspacing=1.2)
-        
+
     for start, end in data_store.flow_paths:
-        ax.annotate("", 
-                    xy=end, 
-                    xytext=start, 
+        # если S/T скрыты — пропускаем рёбра связанные с ними
+        if not data_store.show_st:
+            if start == data_store.s_pos or end == data_store.t_pos:
+                continue
+
+        ax.annotate("",
+                    xy=end,
+                    xytext=start,
                     arrowprops=dict(
-                        arrowstyle="->", 
-                        color='white', 
-                        lw=1.5, 
+                        arrowstyle="->",
+                        color='white',
+                        lw=1.5,
                         alpha=0.6,
                         shrinkA=10,
-                        shrinkB=10  
+                        shrinkB=10
                     ),
                     zorder=2)
 

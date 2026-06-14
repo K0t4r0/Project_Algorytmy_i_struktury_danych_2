@@ -16,7 +16,7 @@ import datetime
 import json
 import time
 from tools.compression_manager import CompManager
-from tools.graph_navigation import connect_navigation
+from tools.graph_navigation import connect_navigation, connect_tooltip, find_nearest
 
 _save_lock = threading.Lock() 
 
@@ -80,6 +80,8 @@ class SegmentPage(ctk.CTkFrame):
             self.ax_edge:  self.graph_state_edge,
             self.ax_meter: self.graph_state_meter,
         })
+        connect_tooltip(self.canvas, [self.ax_edge, self.ax_meter], self._get_tooltip)
+
         # Attack button below the graph
         controls_frame = ctk.CTkFrame(mid_frame, height=60, fg_color="transparent")
         controls_frame.propagate(False)
@@ -595,3 +597,18 @@ class SegmentPage(ctk.CTkFrame):
             finally:
                 if os.path.exists(write_path):
                     os.remove(write_path)
+
+    def _get_tooltip(self, event, ax):
+        mine_pts = [m.pos for m in data_store.mines]
+        i = find_nearest(event, ax, mine_pts)
+        if i is not None:
+            m = data_store.mines[i]
+            return f"Mine {m.id}\nType: {m.mine_type}\nPos: ({m.pos[0]}, {m.pos[1]})"
+
+        guard_pts = [self._guard_coords(g) for g in self.guards]
+        i = find_nearest(event, ax, guard_pts)
+        if i is not None:
+            g = self.guards[i]
+            return f"Guard {g.id}: {g.name}\nLoudness: {g.loudness}\nPos: {g.position_meters:.1f}m\nEdge: {g.edge_index}"
+
+        return None

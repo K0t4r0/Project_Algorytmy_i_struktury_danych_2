@@ -7,7 +7,7 @@ from tools.data_manager import data_store, get_json_files
 from algorithms.hull import graham_generator, jarvis_generator, jarvis, graham_scan
 import os
 import time
-from tools.graph_navigation import connect_navigation
+from tools.graph_navigation import connect_navigation, connect_tooltip, find_nearest
 import threading
 import tempfile
 import hashlib
@@ -135,6 +135,8 @@ class HullPage(ctk.CTkFrame):
             self.ax_graham: self.graph_state_graham,
             self.ax_jarvis: self.graph_state_jarvis,
         })
+
+        connect_tooltip(self.canvas, [self.ax_graham, self.ax_jarvis], self._get_tooltip)
 
         self.apply_step()
 
@@ -408,3 +410,11 @@ class HullPage(ctk.CTkFrame):
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    def _get_tooltip(self, event, ax):
+        mine_pts = [m.pos for m in data_store.mines]
+        i = find_nearest(event, ax, mine_pts)
+        if i is not None:
+            m = data_store.mines[i]
+            return f"Mine {m.id}\nType: {m.mine_type}\nPos: ({m.pos[0]}, {m.pos[1]})"
+        return None

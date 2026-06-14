@@ -12,7 +12,7 @@ from tools.data_manager import data_store, get_json_files
 import os
 import copy
 import hashlib
-from tools.graph_navigation import connect_navigation
+from tools.graph_navigation import connect_navigation, connect_tooltip, find_nearest
 
 
 class FlowPage(ctk.CTkFrame):
@@ -124,6 +124,8 @@ class FlowPage(ctk.CTkFrame):
         connect_navigation(self.canvas, {
             self.ax: self.graph_state,
         })
+
+        connect_tooltip(self.canvas, [self.ax], self._get_tooltip)
 
         self.ax.tick_params(axis='both', colors='white')
 
@@ -327,3 +329,19 @@ class FlowPage(ctk.CTkFrame):
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    def _get_tooltip(self, event, ax):
+        mine_pts = [m.pos for m in data_store.mines]
+        i = find_nearest(event, ax, mine_pts)
+        if i is not None:
+            m = data_store.mines[i]
+            return f"Mine {m.id}\nType: {m.mine_type}\nPos: ({m.pos[0]}, {m.pos[1]})"
+
+        dwarf_pts = [d.home_pos for d in data_store.dwarves]
+        i = find_nearest(event, ax, dwarf_pts)
+        if i is not None:
+            d = data_store.dwarves[i]
+            skills = ", ".join(d.skills)
+            return f"Dwarf {d.id}: {d.name}\nCan mine: {skills}\nPos: ({d.home_pos[0]}, {d.home_pos[1]})"
+
+        return None

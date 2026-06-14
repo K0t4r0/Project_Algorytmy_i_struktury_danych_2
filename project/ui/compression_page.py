@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import datetime
 import customtkinter as ctk
@@ -8,6 +9,13 @@ from algorithms.search import rabin_karp_file_search
 from ui.colors import *
 
 class CompressionPage(ctk.CTkFrame):
+    JSON_TOKEN_RE = re.compile(r'''
+        (?P<string>"(?:\\.|[^"\\])*")
+    | (?P<number>-?\d+\.?\d*(?:[eE][+-]?\d+)?)
+    | (?P<bool>\btrue\b|\bfalse\b|\bnull\b)
+    | (?P<brace>[\{\}\[\]])
+    ''', re.VERBOSE)
+
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=BG_MAIN)
         
@@ -46,6 +54,14 @@ class CompressionPage(ctk.CTkFrame):
         self.textbox.pack(fill="both", expand=True)
         self.textbox.tag_config("highlight", background="yellow", foreground="black")
         self.textbox.tag_config("active_highlight", background="orange", foreground="black")
+        self.textbox.tag_config("json_key",    foreground="#6FB3FF")
+        self.textbox.tag_config("json_string", foreground="#98C379")
+        self.textbox.tag_config("json_number", foreground="#D19A66")
+        self.textbox.tag_config("json_bool",   foreground="#C678DD")
+        self.textbox.tag_config("json_brace",  foreground="#ABB2BF")
+
+        self.textbox.tag_raise("highlight")
+        self.textbox.tag_raise("active_highlight")
 
         controls_frame = ctk.CTkFrame(mid_frame, height=50)
         controls_frame.pack(fill="x", padx=20, pady=(10, 20))
@@ -64,6 +80,15 @@ class CompressionPage(ctk.CTkFrame):
 
         self.next_btn = ctk.CTkButton(controls_frame, text=">", width=30, command=self.next_result)
         self.next_btn.pack(side="left", padx=(0, 10))
+
+        self.jump_output_btn = ctk.CTkButton(
+            controls_frame,
+            text="Output",
+            width=90,
+            fg_color=SECONDARY,
+            command=self.jump_to_output
+        )
+        self.jump_output_btn.pack(side="left", padx=(10, 0))
 
         right_frame = ctk.CTkFrame(main_frame, fg_color=BG_SECONDARY, width=220)
         right_frame.pack(padx=5, fill="y", side="right")
@@ -143,6 +168,7 @@ class CompressionPage(ctk.CTkFrame):
 
             self.textbox.delete("1.0", "end")
             self.textbox.insert("1.0", content)
+            self._highlight_json() 
 
             comp_size = os.stat(kra_path).st_size
             decomp_size = os.stat(os.path.join("decompressed_data", out_name)).st_size
@@ -226,3 +252,43 @@ class CompressionPage(ctk.CTkFrame):
         self.current_search_index = -1
         self.search_entry.delete(0, "end")
         self.update_search_ui()
+
+    def _highlight_json(self):
+        content = self.textbox.get("1.0", "end-1c")
+
+        for tag in ("json_key", "json_string", "json_number", "json_bool", "json_brace"):
+            self.textbox.tag_remove(tag, "1.0", "end")
+
+        for m in self.JSON_TOKEN_RE.finditer(content):
+            kind = m.lastgroup
+            start, end = m.start(), m.end()
+
+            if kind == "string":
+                rest = content[end:end+2]
+                is_key = rest.lstrip().startswith(":")
+                tag = "json_key" if is_key else "json_string"
+            elif kind == "number":
+                tag = "json_number"
+            elif kind == "bool":
+                tag = "json_bool"
+            else:
+                tag = "json_brace"
+
+            start_pos = f"1.0 + {start} chars"
+            end_pos   = f"1.0 + {end} chars"
+            self.textbox.tag_add(tag, start_pos, end_pos)
+
+    def jump_to_output(self):
+        content = self.textbox.get("1.0", "end-1c")
+        idx = content.find('"outputs"')
+        if idx == -1:
+            return
+
+        start_pos = f"1.0 + {idx} chars"
+        end_pos   = f"1.0 + {idx + len('\"outputs\"')} chars"
+
+        self.textbox.see(start_pos)
+        self.textbox.mark_set("insert", start_pos)
+
+        self.textbox.tag_remove("active_highlight", "1.0", "end")
+        self.textbox.tag_add("active_highlight", start_pos, end_pos)
